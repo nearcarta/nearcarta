@@ -11,7 +11,6 @@ const lib = () => (P ||= import('/market/play.bundle.js'));
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
 export const live = load();
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(live)); } catch {} };
-export const on = () => !!live.account;
 
 // A Privy session already in this browser: /setup's Google or email sign-in uses the same Privy app
 // and the same LocalStorage, so its token keys are here. Checked before the signing bundle loads, so a
@@ -20,6 +19,9 @@ export const hasPrivySession = (ls = globalThis.localStorage) => {
   try { return !!(ls && (ls.getItem('privy:token') || ls.getItem('privy:refresh_token'))); } catch { return false; }
 };
 const onTestnet = () => globalThis.NEARCARTA_NET?.net === 'testnet';
+// The mainnet round. On testnet the guest owns the day: a mainnet sign-in kept in this browser (same
+// localStorage) must not paint its mainnet moves into a testnet Receipt.
+export const on = () => !!live.account && !onTestnet();
 
 /**
  * Pick up who is signed in. A visitor who signed in on /setup (Google or email) is already signed in

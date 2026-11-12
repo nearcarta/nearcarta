@@ -39,7 +39,7 @@ export const account = () => (on() ? guestRecord().account : null);
 /** Keep every guest transaction the story made, so the Chronicle and the welcome card can list them. */
 export function record(step, what, r) {
   const all = store();
-  (all.txs ||= []).push({ step, what, hash: r?.hash || null, net: 'testnet', at: Date.now() });
+  (all.txs ||= []).push({ step, what, hash: r?.hash || null, net: 'testnet', account: account(), at: Date.now() });
   save(all);
   return r;
 }
@@ -203,45 +203,68 @@ export async function view(method, args = {}, contract) {
 }
 
 const FERRY_NODES = ['ferry-1', 'ferry-2', 'ferry-3'];
-// A node gives one unit at most once every 30 seconds (contracts/market/src/shops.rs gather).
+// The berths by good (shared/market/sim.js NODES). The Arena buys all four.
+export const NODES_BY_GOOD = {
+  'good:salt': ['ferry-1', 'ferry-2', 'ferry-3'], 'good:herb': ['house-1', 'house-2'],
+  'good:timber': ['toll-1', 'toll-2'], 'good:iron': ['guard-1', 'guard-2'],
+};
+// A node gives one unit at most once every 30 seconds per player (contracts/market/src/shops.rs gather).
 const GATHER_GAP_MS = 31_000;
-let lastGather = 0;
+const lastGather = {};
 const coinText = (y) => { const t = (BigInt(y || 0) * 10n) / 10n ** 20n; return `${t / 10n}.${t % 10n}`; };
-/** Gather and sell salt in rounds of three until the purse holds one share, at most three rounds. */
-async function topUpPurse({ rounds = 3 } = {}) {
+/**
+ * The good the Arena pays most for right now. Every guest sells salt, so its price sinks (1.2 coins with
+ * 119 on the shelf on 2026-11-12) and three salt no longer buy a 10-coin share. Topping up with salt then
+ * took three or four 30 s gather rounds, which is the "Sending one testnet transaction…" hang on Invest.
+ */
+export function bestGood(quotes) {
+  let best = null;
+  for (const [good, q] of Object.entries(quotes || {})) {
+    if (!q?.sell || !NODES_BY_GOOD[good]) continue;
+    if (!best || BigInt(q.sell) > BigInt(quotes[best].sell)) best = good;
+  }
+  return best || 'good:salt';
+}
+/** Gather the best-paying good and sell it into the purse until it holds one share, at most two rounds. */
+async function topUpPurse({ rounds = 2 } = {}) {
   let have = await purse();
   let hash = null;
-  for (let k = 0; have != null && have < MILLI && k < rounds + 1; k++) {
-    // Sell only what the bag really holds. A gather that lands ERR_TOO_SOON (the node's 30 s clock is
-    // the block's, not this browser's) mints nothing, and selling 3 then is refused ERR_PRECHECK_BAG:
-    // that is what stalled the one-click run on prod (2026-11-12).
-    let salt = await saltInBag();
-    if (salt < 3) {
-      const wait = lastGather + GATHER_GAP_MS - Date.now();
+  for (let k = 0; have != null && have < MILLI && k < rounds; k++) {
+    const goods = Object.keys(NODES_BY_GOOD);
+    const qs = Object.fromEntries(await Promise.all(goods.map(async (g) => [g, await view('quote', { shop: 'arena', good: g }).catch(() => null)])));
+    const good = bestGood(qs);
+    const unit = BigInt(qs[good]?.sell || 0);
+    const need = unit > 0n ? Number((MILLI - have + unit - 1n) / unit) : 3;
+    // Sell only what the bag really holds. A gather that lands ERR_TOO_SOON mints nothing, and selling
+    // then is refused ERR_PRECHECK_BAG: that is what stalled the one-click run on prod (2026-11-12).
+    let bag = await goodInBag(good);
+    if (bag < need) {
+      const nodes = NODES_BY_GOOD[good];
+      const wait = Math.max(0, ...nodes.map((n) => (lastGather[n] || 0) + GATHER_GAP_MS - Date.now()));
       if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-      const g = await move(FERRY_NODES.map((node) => ({ method: 'gather', args: { node }, tgas: 15 }))).catch((e) => ({ ok: false, failure: String(e?.code || e?.message || e) }));
-      lastGather = Date.now();
+      const g = await move(nodes.map((node) => ({ method: 'gather', args: { node }, tgas: 15 }))).catch((e) => ({ ok: false, failure: String(e?.code || e?.message || e) }));
+      for (const n of nodes) lastGather[n] = Date.now();
       if (g?.ok !== false && g?.hash) hash = g.hash;
-      salt = await waitForSalt(salt + 1);
+      bag = await waitForGood(good, bag + 1);
     }
-    if (salt < 1) continue;
-    const qty = Math.min(3, salt);
-    const q = await view('quote', { shop: 'arena', good: 'good:salt' }).catch(() => null);
-    const min = q?.sell ? (BigInt(q.sell) * BigInt(qty) * 7n) / 10n : 1n;
-    const r = await move({ method: 'sell', args: { shop: 'arena', good: 'good:salt', qty, min_total: String(min), keep: true }, tgas: 20 }).catch(() => null);
+    if (bag < 1) continue;
+    const qty = Math.min(bag, Math.max(1, need));
+    const min = unit > 0n ? (unit * BigInt(qty) * 7n) / 10n : 1n;
+    const r = await move({ method: 'sell', args: { shop: 'arena', good, qty, min_total: String(min), keep: true }, tgas: 20 }).catch(() => null);
     hash = r?.hash || hash;
     await new Promise((r2) => setTimeout(r2, 1500));
     have = await purse();
   }
   return { have, hash, short: have != null && have < MILLI };
 }
-const saltInBag = async () => { try { return Number(await view('mt_balance_of', { account_id: account(), token_id: 'good:salt' })) || 0; } catch { return 0; } };
+const goodInBag = async (good) => { try { return Number(await view('mt_balance_of', { account_id: account(), token_id: good })) || 0; } catch { return 0; } };
 /** The relayer's pre-check reads final state, a block or two behind the gather it just sent. */
-async function waitForSalt(want, ms = 9000) {
-  const end = Date.now() + ms; let n = await saltInBag();
-  while (n < want && Date.now() < end) { await new Promise((r) => setTimeout(r, 1200)); n = await saltInBag(); }
+async function waitForGood(good, want, ms = 9000) {
+  const end = Date.now() + ms; let n = await goodInBag(good);
+  while (n < want && Date.now() < end) { await new Promise((r) => setTimeout(r, 1200)); n = await goodInBag(good); }
   return n;
 }
+const waitForSalt = (want, ms) => waitForGood('good:salt', want, ms);
 const purse = async () => { try { const sq = await view('square', { account_id: account() }); return BigInt(sq?.purse ?? 0n); } catch { return null; } };
 
 /**
@@ -256,7 +279,7 @@ export async function step(id, ctx = {}) {
   if (id === 'cargo') {
     // Three gathers through the relayer: each one mints NEP-245 salt to the guest.
     const r = await move(FERRY_NODES.map((node) => ({ method: 'gather', args: { node }, tgas: 15 })));
-    lastGather = Date.now();
+    for (const n of FERRY_NODES) lastGather[n] = Date.now();
     return record(id, 'Unloaded 3 salt at the Ferry (testnet)', r);
   }
   if (id === 'sell') {

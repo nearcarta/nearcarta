@@ -54,6 +54,7 @@ import { marketStatus, marketWorkers, readBounties } from './hall-market.js';
 import { derivedFor, lineFor } from './house-views.js';
 import { deedHistory } from './deed-history.js';
 import { HOUSE_LEGACY, HOUSE_SHOP } from '../../shared/house/shop.js';
+import { deedRecord } from './house-deed.js';
 
 // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
 async function houseView() {
@@ -447,7 +448,10 @@ app.get('/api/deployments', limiter(30), c => c.json((NET === 'testnet' ? DEP : 
   // call for the visitor's wallet (NEAR Connect signAndSendTransaction); token_id is the minter's account id.
   // The live shop is house.nearcarta.near (extras.house in mainnet.json). house_deed was never a key in mainnet.json, so these routes used to 404
   // and the city could never load a deed. Contracts/house_nft mint_deed takes {house, cap} and 0.02 NEAR minimum.
-  const D = DEP.house_deed || { contract: HOUSE_SHOP, mint: { gas: '100000000000000', deposit_yocto: '20000000000000000000000' } };
+  // On testnet the deed contract is that network's house (house_nft, testnet.json `house`). Falling back to
+  // the mainnet shop there asked the testnet RPC for house.nearcarta.near, which threw UNKNOWN_ACCOUNT and
+  // turned every /api/house/deed/:account into a 500 (Render testnet logs, 2026-11-12 07:35Z).
+  const D = deedRecord(DEP, NET, HOUSE_SHOP);
   const deedTx = (house) => ({ receiverId: D.contract, actions: [{ type: 'FunctionCall', params: { methodName: 'mint_deed',
     args: { house: house || null, cap: '50000000000000000000000' }, gas: D.mint.gas, deposit: D.mint.deposit_yocto } }] });
   app.get('/api/house/deed', limiter(20), async c => {
@@ -464,8 +468,14 @@ app.get('/api/deployments', limiter(30), c => c.json((NET === 'testnet' ? DEP : 
   app.get('/api/house/deed/:account', limiter(20), async c => {
     if (!D) return c.json({ error: 'no deed contract' }, 404);
     const a = c.req.param('account'); if (!ACCT.test(a)) return c.json({ error: 'not an account id' }, 400);
-    const [token, held] = await Promise.all([view(D.contract, 'nft_token', { token_id: a }), view(D.contract, 'nft_tokens_for_owner', { account_id: a, limit: 10 })]);
-    const purses = Object.fromEntries(await Promise.all((held || []).map(async t => [t.token_id, await view(D.contract, 'house_purse', { token_id: t.token_id })])));
+    let token, held, purses;
+    try {
+      [token, held] = await Promise.all([view(D.contract, 'nft_token', { token_id: a }), view(D.contract, 'nft_tokens_for_owner', { account_id: a, limit: 10 })]);
+      purses = Object.fromEntries(await Promise.all((held || []).map(async t => [t.token_id, await view(D.contract, 'house_purse', { token_id: t.token_id })])));
+    } catch (e) {
+      // A read the chain cannot answer is not a server fault: say which contract and why, without a 500.
+      return c.json({ contract: D.contract, token: null, held: [], error: 'deed read failed', why: String(e?.message || e).slice(0, 160) }, 502);
+    }
     return token || held?.length ? c.json({ contract: D.contract, token, held, purses }) : c.json({ contract: D.contract, token: null, held: [], mint: deedTx(null) }, 404);
   });
   app.get('/api/house/derived/:account', limiter(12), async c => {

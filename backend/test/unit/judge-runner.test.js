@@ -84,8 +84,8 @@ test('a guest invest tops the purse up to one share first, and says so when the 
   // One share is one milliNEAR from the purse; the top-up runs before the invest move.
   assert.ok(inv.indexOf('topUpPurse()') > 0 && inv.indexOf('topUpPurse()') < inv.indexOf("action: 'invest'"));
   assert.match(inv, /ERR_PURSE_SHORT/);
-  // Bounded: at most three rounds, each gather spaced past the node's 30 s gap.
-  assert.match(g, /async function topUpPurse\(\{ rounds = 3 \}/);
+  // Bounded: at most two rounds (it sells the best-paying good), each gather spaced past the node's 30 s gap.
+  assert.match(g, /async function topUpPurse\(\{ rounds = 2 \}/);
   assert.match(g, /GATHER_GAP_MS = 31_000/);
   // The sell line shows the real quote before and after, not the practice price.
   assert.match(g, /before: BigInt\(q\.sell\), after: BigInt\(q2\.sell\)/);
