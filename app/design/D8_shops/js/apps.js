@@ -669,6 +669,7 @@ export async function toll(quote) {
  * Every crossing this row has on the toll, oldest first. `get_order` ids are dense from 0, so the
  * walk stops at the first missing id. A read that errors is retried, never taken as "none".
  */
+export const tollAcct = () => TS.TOLL_ACCT;
 export async function rowOrders(shop, owner) {
   const out = [];
   for (let id = 0; id < 64; id++) {

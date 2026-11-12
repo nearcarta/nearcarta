@@ -726,7 +726,12 @@ async function tollPay(quote) {
   // ERR_EFFECT after the wallet has approved. Decide from the row's own storage before signing.
   const effectsFit = effectBudgetFits(row);
   const effectsKnown = effectsFit === false ? false : null;
-  const why = tollCapCheck({
+  // F61: a crossing already paid for (an open, signing or signed order of this row) charges no
+  // new pass, so the pass-fee checks below (balance, daily budget) must not refuse it.
+  const toLc = String(quote.to || '').toLowerCase();
+  const paidAlready = (await A.rowOrders(A.tollAcct(), A.S.me).catch(() => []))
+    .some(o => o.status === 'signing' || (o.status === 'open' && o.to === toLc && o.asset === quote.asset));
+  const why = paidAlready ? null : tollCapCheck({
     receivers: row.receivers || A.S.clauses.pay?.receivers,
     capYocto: row.per_action_cap ?? A.S.clauses.pay?.per_action_cap,
     balanceYocto: row.balance,
