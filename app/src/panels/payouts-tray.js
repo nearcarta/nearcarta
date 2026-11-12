@@ -161,7 +161,7 @@ export function mountPayouts(root, hooks) {
         <p class="payout-calm" data-testid="payout-anchor-note">${state.anchorBlocked
           ? esc(state.anchorBlocked)
           : state.anchored
-          ? `Anchored. tx ${esc(String(state.anchored).slice(0, 10))}… Anyone can read the commitment back from the board.`
+          ? `Anchored: <a class="rc tx" data-testid="payout-anchor-tx" href="${esc(txUrl(String(state.anchored)))}" target="_blank" rel="noopener">${esc(String(state.anchored))}</a>. Anyone can read the commitment back from the board.`
           : 'This host keeps the invoice in a file, so a new host starts empty. Anchoring writes its digest on chain: the link then has a public record that does not depend on this server.'}</p>
       </div>
     </div>`;
@@ -515,7 +515,7 @@ export function mountPayouts(root, hooks) {
     }
     if (sent?.ok && sent.tx) {
       state.anchored = sent.tx;
-      state.payLine = `Anchored. tx ${String(sent.tx).slice(0, 10)}… The board logs this commitment; it stores nothing.`;
+      state.payLine = `Anchored on the board, tx ${String(sent.tx)}. The board logs this commitment; it stores nothing.`;
     } else {
       state.payLine = sent?.hint || 'The anchor did not go. Nothing was signed.';
     }

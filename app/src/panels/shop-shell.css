@@ -214,9 +214,15 @@ body #shopUI #tray > .t-scroll > #t-track {
 #shopUI #tray .ferry-pane[data-pane='invoice'] > .p-create,
 #shopUI #tray .ferry-pane[data-pane='invoice'] > .payout-status,
 #shopUI #tray .ferry-pane[data-pane='invoice'] > [class*='card'],
-#shopUI #tray .ferry-pane[data-pane='invoice'] > .note {
+#shopUI #tray .ferry-pane[data-pane='invoice'] > .note,
+/* F31: the created invoice (facts, link, QR, anchor) was squeezed into one half-width cell. */
+#shopUI #tray .payout-invoice-pane > .payout-result,
+#shopUI #tray .ferry-pane[data-pane='invoice'] > .payout-result,
+#shopUI #tray .payout-invoice-pane > .payout-calm,
+#shopUI #tray .ferry-pane[data-pane='invoice'] > .payout-calm {
   grid-column: 1 / -1;
 }
+#shopUI #tray .payout-result .payout-link a { overflow-wrap: anywhere; word-break: break-all; }
 @media (max-width: 359px) {
   #shopUI #tray .ferry-picker,
   #shopUI #tray .guard-pane[data-pane='check'],
