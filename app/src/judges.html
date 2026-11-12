@@ -8,7 +8,22 @@
 <link rel="stylesheet" href="/brand/chrome.css">
 <link rel="stylesheet" href="/console.css">
 <link rel="stylesheet" href="/brand/brown.css">
-<style>.judge-sec { margin: 24px 16px 8px; font-size: 20px; color: #f7d57e; }</style>
+<style>
+.judge-sec { margin: 24px 16px 8px; font-size: 20px; color: #f7d57e; }
+/* A solid sticky header: card headings used to ghost through the translucent gradient while scrolling. */
+body > header { background: #120e0b !important; box-shadow: 0 1px 0 #3a2c1f, 0 8px 18px rgba(0,0,0,.45); }
+/* One centred column that uses a wide screen instead of a ~720 px strip. */
+body > header, .judge-sec, body > main { box-sizing: border-box; width: min(1240px, 100%); margin-left: auto; margin-right: auto; }
+body > main { padding: 0 16px; max-width: none; }
+#judge-runner .judge-runner { max-width: none; margin: 12px 0 20px; }
+/* One link style: brass and underlined in text, the same pill for every proof action. */
+.judge-step a:not(.pill), header .links a, #judge-runner a { color: #f5d08a; text-decoration: underline; text-underline-offset: 2px; }
+.judge-step a:not(.pill):hover, header .links a:hover, #judge-runner a:hover { color: #ffe3a6; }
+header .links a { margin-right: 14px; }
+.judge-step a.pill { display: inline-flex; align-items: center; min-height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid #c98f4e; color: #f5d08a; background: rgba(26,20,15,.8); text-decoration: none; font-weight: 600; }
+.judge-step a.pill:hover { background: rgba(201,143,78,.18); }
+.judge-step .why-failed { display: inline-block; margin-left: 8px; color: #d4c4a8; font-size: 13px; }
+</style>
 </head>
 <body>
 <header>

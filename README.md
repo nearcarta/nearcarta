@@ -107,7 +107,7 @@ Status: live. The nine keepers form the market council on chain (quorum 5). Each
 | Play the whole day | Coins, a purse, a stall, a share. No wallet popup, no hash, no gas prompt in the main flow |
 | Tap the purse in the top bar | The Receipt: each finished step, and a quiet **Record** link to its real mainnet transaction for those who want proof |
 
-Status: sponsored gas is live. Each real move is signed by the player and sent by relayer.nearcarta.near, which pays the gas within caps per visitor and per day. In the prod run above, the player's NEAR stayed at 0.003 from the first move to the last ([2TXeZ4hR…](https://nearblocks.io/txns/2TXeZ4hRu2EB4zw9cG6zdq9jgfswKRQs6BwRu1K1uPRM) gather, sell, stall, invest). Email sign-in (Privy) is built and is being confirmed with a real inbox. Judges: every proof is on `/judge`.
+Status: sponsored gas is live. Each real move is signed by the player and sent by relayer.nearcarta.near, which pays the gas within caps per visitor and per day. In the prod run above, the player's NEAR stayed at 0.003 from the first move to the last ([2TXeZ4hR…](https://nearblocks.io/txns/2TXeZ4hRu2EB4zw9cG6zdq9jgfswKRQs6BwRu1K1uPRM) gather, sell, stall, invest). Google sign-in (Privy) on /setup plays the same account in Market Day, with no popup. Judges: every proof is on `/judge`.
 
 
 ### Try free: a guest account on the test network

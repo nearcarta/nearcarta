@@ -49,3 +49,16 @@ test('F18: the price line shows enough decimals to see the move', async () => {
   assert.equal(priceMove(COIN, COIN).same, true);
   assert.match(city, /pm\.down \? 'Your sale pushed the price down/);
 });
+
+test('F19-F22: /judge header is solid, the column is wide and centred, no unfinished line, refusal says Failed on purpose', async () => {
+  const html = read('app/src/judges.html');
+  assert.match(html, /body > header \{ background: #120e0b !important;/);
+  assert.match(html, /width: min\(1240px, 100%\); margin-left: auto; margin-right: auto;/);
+  const data = read('app/src/judges-data.js');
+  assert.doesNotMatch(data, /being confirmed/);
+  const { renderGames, FAILED_NOTE } = await import('../../../app/src/judges-data.js');
+  const g = renderGames();
+  assert.match(g, /Open the refusal<\/a><span class="why-failed"/);
+  assert.ok(g.includes(FAILED_NOTE));
+  assert.match(FAILED_NOTE, /Failed on purpose/);
+});
