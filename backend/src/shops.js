@@ -67,9 +67,34 @@ async function townhallR16() {
   } catch { return null; }
 }
 
+const MARKET_GOODS = ['good:salt', 'good:fish', 'good:grain', 'good:lamp'];
+/** The market crate's own state: config, the square (rules, council, stalls) and live quotes. */
+export async function arenaMarket(A, config, v = view, va = viewAccount) {
+  const [square, acct, tokens] = await Promise.all([
+    v(A, 'square', {}).catch(() => null), va(A).catch(() => null), v(A, 'mt_tokens', { limit: 40 }).catch(() => []),
+  ]);
+  const known = (Array.isArray(tokens) ? tokens : []).map(t => t?.token_id).filter(id => typeof id === 'string' && id.startsWith('good:'));
+  const goods = known.length ? known.slice(0, 8) : MARKET_GOODS;
+  const quotes = (await Promise.all(goods.map(g => v(A, 'quote', { shop: 'arena', good: g }).then(q => (q ? { good: g, buy: q.buy, sell: q.sell, reasons: q.reasons || [] } : null)).catch(() => null)))).filter(Boolean);
+  const now = BigInt(Date.now()) * 1_000_000n;
+  const stalls = [];
+  for (let id = 1; id <= 4; id++) {
+    const s = (square?.stalls || []).find(x => Number(x.id) === id);
+    const held = !!(s && s.holder && BigInt(s.until || 0) > now);
+    stalls.push({ id, held, holder: held ? s.holder : null, until: held ? String(s.until) : null, good: s?.good || '', qty: s?.qty || 0, price: s?.price || '0' });
+  }
+  return {
+    network: 'mainnet', contract: A, kind: 'market', config, rules: square?.rules || null, council: square?.council || null,
+    stalls, free_stall: stalls.find(s => !s.held)?.id ?? null, quotes, balance_near: acct ? yocto(acct.amount) : null,
+  };
+}
+
 export async function arena() {
   const A = DEP.arena?.contract || MAINNET_DEP?.extras?.arena?.contract;
   if (!A) return { network: 'mainnet', contract: null };
+  // On mainnet the account runs the market crate: read that instead of guardian views it does not have.
+  const config = await view(A, 'get_config').catch(() => null);
+  if (config && config.caps && 'gathers_per_day' in config.caps) return arenaMarket(A, config);
   const [season, guardian, acct] = await Promise.all([view(A, 'get_season'), view(A, 'get_guardian', { token_id: 'g1' }), viewAccount(A)]);
   const cases = ['case:C1_CAP', 'case:C3_ALLOWLIST', 'case:C5_NO_BOUNTY', 'case:C6_BAD_PROOF', 'case:C7_HANDOFF', 'case:C9_STOCK', 'key:brass'];
   const supply = await view(A, 'mt_batch_supply', { token_ids: cases }).catch(() => []);
