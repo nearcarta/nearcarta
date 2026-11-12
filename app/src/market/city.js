@@ -114,7 +114,7 @@ const fail = (e) => toast(WHY[e.code] || e.message, 'no');
 // demo purse and a guest all end here; only the receipt line under it differs.
 const REWARD_LINE = () => {
   const st = Q.state(city);
-  const coinsEarned = Q.STEPS.length * Q.COIN;
+  const coinsEarned = BigInt(Q.STEPS.length) * BigInt(Q.COIN);
   return `you keep ${coins(coinsEarned)} coins${st.toll ? ` after ${coins(st.toll)} toll` : ''}${GT.on() ? ' · every step is a testnet receipt' : ''}`;
 };
 
