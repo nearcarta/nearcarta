@@ -55,6 +55,7 @@ function gold(id, testid, label, busy = '') {
   if (busy) return `<button type="button" class="primary guard-cta" id="${id}" data-testid="${testid}" disabled aria-busy="true">${busy}</button>`;
   return `<button type="button" class="primary guard-cta" id="${id}" data-testid="${testid}">${label}</button>`;
 }
+const nearOf = (y) => { try { const v = BigInt(y || 0); const w = v / 10n ** 24n, f = (v % 10n ** 24n).toString().padStart(24, '0').replace(/0+$/, ''); return f ? `${w}.${f.slice(0, 6)}` : String(w); } catch { return ''; } };
 const BUSY = { pay: 'Paying… waiting for the chain', confirm: 'Releasing… waiting for the chain', cancel: 'Refunding… waiting for the chain', agent: 'Working…' };
 
 export function guardMarkup(state = {}, _attacks = [], esc = s => String(s ?? '')) {
@@ -73,9 +74,18 @@ export function guardMarkup(state = {}, _attacks = [], esc = s => String(s ?? ''
   const status = statusBlock(state, esc);
   const held = state.pending === 'human' && state.holdId;
   const heldBusy = BUSY[state.inflight] || '';
+  // F62: the card names what is held (amount, payee), read from the board's own hold record.
+  // A hold the board can never release (signed while the row had no confirm key) offers only
+  // the refund, so the camera never sees a Confirm that cannot work.
+  const hi = held && state.holdInfo && String(state.holdInfo.id) === String(state.holdId) ? state.holdInfo : null;
+  const what = hi && hi.payee ? ` ${esc(hi.amountNear || '')} NEAR to <b data-testid="guard-held-payee">${esc(hi.payee)}</b>.` : '';
+  const stuck = hi && hi.confirmable === false;
+  const heldWords = stuck
+    ? `The board can no longer release it (${esc(hi.stuck || 'not confirmable')}). Cancel returns it to your row.${hi.rowHasKey ? '' : ' Add my confirm key lets you confirm the next held payment here.'}`
+    : 'Only you can confirm it: Confirm sends it, Cancel refunds it to your row.';
   const heldCard = held
-    ? `<div class="guard-held" data-testid="guard-held" role="status"><p class="guard-status"><b>Held on the board · hold #${esc(String(state.holdId))}.</b> Only you can confirm it: Confirm sends it, Cancel refunds it to your row.</p>
-      <div class="guard-actions">${gold('g-confirm', 'guard-confirm', 'Confirm this payment', heldBusy)}<button type="button" class="guard-quiet" id="g-cancel" data-testid="guard-cancel"${heldBusy ? ' disabled' : ''}>Cancel</button></div></div>`
+    ? `<div class="guard-held" data-testid="guard-held" role="status"><p class="guard-status"><b>Held on the board · hold #${esc(String(state.holdId))}.</b>${what} ${heldWords}</p>
+      <div class="guard-actions">${stuck && hi.rowHasKey ? '' : gold('g-confirm', 'guard-confirm', stuck ? 'Add my confirm key' : 'Confirm this payment', heldBusy)}<button type="button" class="guard-quiet" id="g-cancel" data-testid="guard-cancel"${heldBusy ? ' disabled' : ''}>Cancel</button></div></div>`
     : '';
   const check = `<div class="guard-pane" data-pane="check" data-testid="guard-pane-check" ${tab === 'check' ? '' : 'hidden'}>
       ${tab === 'check' ? heldCard : ''}
@@ -349,9 +359,11 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
     // payee" hint while the fields on screen were filled.
     if (pay) pay.onclick = () => { readForm(); return runPlan({ ok: true, action: 'pay' }); };
     const confirm = q$(root, '#g-confirm');
-    if (confirm) confirm.onclick = () => runPlan({ ok: true, action: 'confirm', actor: 'human' });
+    // F62: after Confirm or Cancel the board's own record decides what the card shows next.
+    const reread = () => setTimeout(() => { syncHolds(); }, 2500);
+    if (confirm) confirm.onclick = () => Promise.resolve(runPlan({ ok: true, action: 'confirm', actor: 'human' })).finally(reread);
     const cancel = q$(root, '#g-cancel');
-    if (cancel) cancel.onclick = () => runPlan({ ok: true, action: 'cancel' });
+    if (cancel) cancel.onclick = () => Promise.resolve(runPlan({ ok: true, action: 'cancel' })).finally(reread);
     const cancelRestored = q$(root, '#g-cancel-restored');
     if (cancelRestored) cancelRestored.onclick = () => runPlan({ ok: true, action: 'cancel' });
     const freeze = q$(root, '#g-freeze');
@@ -418,6 +430,14 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
     const had = state.holdId ? String(state.holdId) : '';
     if (had && !ids.includes(had)) { state.holdId = null; state.pending = null; }
     if (!state.holdId && ids.length) { state.holdId = ids[ids.length - 1]; state.pending = 'human'; }
+    if (state.holdId && typeof hooks.holdInfo === 'function') {
+      const id = String(state.holdId);
+      try {
+        const info = await hooks.holdInfo(id);
+        if (info && info.open) state.holdInfo = { ...info, id, amountNear: nearOf(info.amountYocto) };
+      } catch { /* the card still shows the id */ }
+      if (root?.isConnected !== false) paint();
+    }
     if (String(state.holdId || '') === had) return;
     try {
       const k = 'nearcarta.guard.hold.' + (state.owner || '');
