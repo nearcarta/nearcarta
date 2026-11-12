@@ -34,7 +34,12 @@ export const sound = snd;
 export function sfx(name, opt) { events.push({ t: +clock.T.toFixed(3), name }); snd.play(name, opt); }
 
 // glTF loader with cache
-const loader = new GLTFLoader(); const cache = new Map();
+// F63: every hex prop names its own copy of the same 1024px palette image. One URL and THREE.Cache
+// mean one download and one decode per page instead of one per prop (the Ferry paid seven).
+THREE.Cache.enabled = true;
+const manager = new THREE.LoadingManager();
+manager.setURLModifier((u) => u.replace(/\/hex\/[^?#]*\/hexagons_medieval\.png/, '/hex/tiles/base/hexagons_medieval.png'));
+const loader = new GLTFLoader(manager); const cache = new Map();
 // KayKit's palette atlas, recoloured swatch by swatch exactly like D9 (design/D9_world/js/world.js):
 // blue team roofs → terracotta tile, water → sea-glass teal, acid grass → olive-sage. One shared texture.
 const SW = { 8: ['#7fb3ad', '#3f6f6d'], 9: ['#6fa39e', '#2f5b5b'], 12: ['#93a46c', '#52653b'], 16: ['#8f9d63', '#55663a'], 17: ['#6f8a58', '#32503a'], 19: ['#a8977c', '#7b6a55'], 24: ['#a8644a', '#5e3427'], 27: ['#6b8754', '#2f4a36'] };
@@ -47,6 +52,22 @@ const fixTex = (g, p) => { const hex = p.startsWith('hex/'); g.scene.traverse(m 
   if (hex && t.image && t.image.width === 1024) { m.material.map = atlasFrom(t.image); m.material.needsUpdate = true; return; }
   t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; t.anisotropy = 1; t.needsUpdate = true; } }); return g; };
 export const load = p => { if (!cache.has(p)) cache.set(p, new Promise((res, rej) => loader.load(ASSETS + p + (p.endsWith('.glb') ? '' : '.gltf'), g => res(fixTex(g, p)), undefined, rej))); return cache.get(p); };
+// F63: every model a room puts, so its door can fetch and parse them side by side. Each room's
+// module awaits its props one after another; with these warm, those awaits resolve at once.
+const R = 'chars/Rogue_Hooded.glb';
+export const ROOM_ASSETS = {
+  hall: [R, 'hex/decoration/props/crate_A_big', 'hex/decoration/props/flag_blue'],
+  ferry: [R, 'hex/tiles/base/hex_water', 'hex/tiles/base/hex_grass', 'hex/decoration/props/barrel', 'hex/decoration/props/sack', 'hex/decoration/props/crate_A_big', 'hex/decoration/nature/waterlily_A', 'hex/decoration/nature/waterlily_B', 'hex/decoration/nature/waterplant_A', 'hex/decoration/props/crate_A_small'],
+  toll: [R, 'hex/tiles/base/hex_grass', 'hex/tiles/base/hex_water', 'hex/buildings/blue/building_tower_base_blue', 'hex/buildings/neutral/building_bridge_A'],
+  guard: [R, 'hex/buildings/neutral/wall_straight_gate', 'hex/decoration/props/barrel', 'hex/decoration/props/bucket_arrows', 'hex/decoration/props/target', 'hex/decoration/props/weaponrack'],
+  arena: [R, 'hex/decoration/props/bucket_arrows', 'hex/decoration/props/target', 'hex/decoration/props/weaponrack'], // Knight.glb (1.1 MB) stays with the room itself
+  bank: [R, 'hex/decoration/props/crate_B_small', 'hex/decoration/props/sack'],
+  payouts: [R, 'hex/decoration/props/crate_B_small', 'hex/decoration/props/sack'],
+  house: [R, 'hex/decoration/props/barrel'],
+  chronicle: [R, 'hex/decoration/props/crate_A_big'],
+};
+/** Start every model of a room loading now. Never throws; resolves when all have settled. */
+export const warm = (id) => Promise.all((ROOM_ASSETS[id] || []).map((p) => load(p).catch(() => null)));
 export function shade(o, cast = true, recv = true) { o.traverse(m => { if (m.isMesh) { m.castShadow = cast; m.receiveShadow = recv; } }); return o; }
 export async function put(scene, name, { x = 0, y = 0, z = 0, ry = 0, s = 1, fitW = 0 } = {}) {
   const g = await load('hex/' + name); const o = g.scene.clone(true);

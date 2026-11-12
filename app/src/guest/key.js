@@ -126,14 +126,21 @@ export async function guestSigner({ store = globalThis.localStorage, net = NET, 
     kind: 'guest',
     accountId: v.account,
     publicKey: v.publicKey,
-    /** A direct view call. Free, no signing. */
+    /**
+     * A direct view call. Free, no signing. F63: optimistic, the same finality the guest's own
+     * transactions now wait for, so a read right after a step sees that step.
+     */
     async view(contractId, method, args = {}) {
-      const r = await account.provider.callFunction({ contractId, method, args, blockQuery: { finality: 'final' } });
+      const r = await account.provider.callFunction({ contractId, method, args, blockQuery: { finality: 'optimistic' } });
       return r ?? null;
     },
-    /** A direct transaction the guest signs and sends itself. */
+    /**
+     * A direct transaction the guest signs and sends itself. F63: it waits until every receipt has run
+     * (EXECUTED_OPTIMISTIC, about 1 s on testnet), not for finality (about 4 s here, three times per
+     * Town Hall step). The outcome, its failure and its hash are the same; this is testnet only.
+     */
     async call(contractId, method, args = {}, { deposit = 0n, gas = 100n * 10n ** 12n } = {}) {
-      const r = await account.signAndSendTransaction({ receiverId: contractId, waitUntil: 'FINAL', throwOnFailure: false, actions: [A.functionCall(method, args, gas, deposit)] });
+      const r = await account.signAndSendTransaction({ receiverId: contractId, waitUntil: 'EXECUTED_OPTIMISTIC', throwOnFailure: false, actions: [A.functionCall(method, args, gas, deposit)] });
       return { hash: r?.transaction?.hash || null, failure: failureOf(r), raw: r };
     },
     /**
@@ -148,7 +155,7 @@ export async function guestSigner({ store = globalThis.localStorage, net = NET, 
     },
     /** The account's balance in yoctoNEAR, or null when it cannot be read. */
     async balance() {
-      try { const a = await account.provider.viewAccount({ accountId: v.account, blockQuery: { finality: 'final' } }); return String(a.amount); } catch { return null; }
+      try { const a = await account.provider.viewAccount({ accountId: v.account, blockQuery: { finality: 'optimistic' } }); return String(a.amount); } catch { return null; }
     },
     /** The JSON a "Save my test key" button downloads. It says in words that it is worth nothing. */
     exportKey() {

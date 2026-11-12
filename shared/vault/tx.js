@@ -53,26 +53,55 @@ export function signTx({ key, signerId, receiverId, nonce, blockHash, actions })
 // next URL is tried (rounds with backoff). A JSON-RPC error or a network failure is not retried here:
 // a send_tx that may have reached a node must not be sent twice.
 const RETRY_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
-export function rpcClient(urls, fetchImpl = fetch, { rounds = 3, backoffMs = 300, sleep = ms => new Promise(r => setTimeout(r, ms)) } = {}) {
-  const list = (Array.isArray(urls) ? urls : [urls]).filter(Boolean);
+// F64 (film 2026-11-12): a Guard cancel sat on "waiting for the chain" while free.rpc.fastnear.com
+// answered 429. Now a URL that answers 429/5xx rests for a while (its Retry-After, else 8 s) and the
+// next call starts at a URL that is not resting, so a busy node is not hit again on every read.
+// Identical reads that are in flight share one request, and a read's answer is kept for `cacheMs`,
+// so pollers and panels that ask the same thing at once cost one call. Sends are never shared or kept.
+const READS = new Set(['query', 'block', 'gas_price', 'validators', 'status']);
+export function rpcClient(urls, fetchImpl = fetch, { rounds = 3, backoffMs = 300, sleep = ms => new Promise(r => setTimeout(r, ms)), cacheMs = 1500, restMs = 8000, now = () => Date.now() } = {}) {
+  const list = [...new Set((Array.isArray(urls) ? urls : [urls]).filter(Boolean))];
+  const restUntil = new Map();
+  const inflight = new Map();
+  const kept = new Map();
   let id = 0;
-  return async (method, params) => {
+  const order = () => { const t = now(); const up = list.filter(u => !(restUntil.get(u) > t)); const down = list.filter(u => restUntil.get(u) > t).sort((a, b) => restUntil.get(a) - restUntil.get(b)); return [...up, ...down]; };
+  const once = async (method, params) => {
     let last;
     for (let round = 0; round < rounds; round++) {
-      for (const url of list) {
+      for (const url of order()) {
         let r;
         // A network error (offline host, DNS, CORS) falls through to the next URL like a 429.
         try { r = await fetchImpl(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: ++id, method, params }) }); }
-        catch (e) { last = new Error(`rpc ${method} network error at ${url}: ${e.message}`); continue; }
-        if (!r.ok) { last = new Error(`rpc ${method} http ${r.status}`); if (RETRY_STATUS.has(r.status)) continue; throw last; }
+        catch (e) { last = new Error(`rpc ${method} network error at ${url}: ${e.message}`); restUntil.set(url, now() + restMs); continue; }
+        if (!r.ok) {
+          last = new Error(`rpc ${method} http ${r.status}`);
+          if (RETRY_STATUS.has(r.status)) { const ra = Number(r.headers?.get?.('retry-after')); restUntil.set(url, now() + (ra > 0 ? Math.min(ra * 1000, 60_000) : restMs)); continue; }
+          throw last;
+        }
         const j = await r.json();
         if (j.error) { const e = new Error(`rpc ${method}: ${j.error.cause?.name || j.error.name || 'error'} ${JSON.stringify(j.error.data ?? j.error.cause?.info ?? '').slice(0, 300)}`); e.rpc = j.error; throw e; }
+        restUntil.delete(url);
         return j.result;
       }
       if (round + 1 < rounds) await sleep(backoffMs * 2 ** round);
     }
     throw last;
   };
+  const call = async (method, params) => {
+    if (!READS.has(method)) { kept.clear(); return once(method, params); }
+    const key = method + JSON.stringify(params ?? null);
+    const hit = kept.get(key);
+    if (hit && now() - hit.at < cacheMs) return hit.v;
+    if (inflight.has(key)) return inflight.get(key);
+    const p = once(method, params).then(v => { kept.set(key, { at: now(), v }); if (kept.size > 300) kept.delete(kept.keys().next().value); return v; }).finally(() => inflight.delete(key));
+    inflight.set(key, p);
+    return p;
+  };
+  call.urls = list;
+  /** Forget kept reads (after a send this client did not make, e.g. a wallet's). */
+  call.clear = () => kept.clear();
+  return call;
 }
 
 export async function viewFn(rpc, accountId, method, args = {}) {

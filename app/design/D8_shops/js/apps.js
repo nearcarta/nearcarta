@@ -142,7 +142,8 @@ async function boot0(onChange) {
   let urls = [CFG.rpc, ...(CFG.rpc_fallbacks || [])];
   if (onMain()) {
     S.mainnet = await api('/api/mainnet').catch(() => null);
-    if (S.mainnet?.rpc) urls = [S.mainnet.rpc];
+    // F64: the record's RPC first, then the network's other public nodes, so a 429 moves on.
+    if (S.mainnet?.rpc) urls = [S.mainnet.rpc, ...(NETCFG().rpc || [])];
   }
   rpc = W.rpcClient(urls);
   ({ connector: conn } = W.makeConnector(rpc));
@@ -239,17 +240,22 @@ export function userCancelled(e) {
   const s = String(e.message || e);
   return /user rejected|user cancelled|user canceled|rejected the transaction|rejected the request|approval.*closed|dismissed the|closed the prompt/i.test(s);
 }
+// F64 (film 2026-11-12): a Guard cancel waited forever on "Refunding… waiting for the chain" when the
+// wallet never answered. A wallet that has not come back in SIGN_WAIT_MS is reported in words; the
+// press can be repeated (a second cancel of the same hold is refused on chain, it never refunds twice).
+export const SIGN_WAIT_MS = 120_000;
+const inTime = (p, ms, what) => { let t; return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => rej(Object.assign(new Error(`${what} did not answer in ${Math.round(ms / 1000)} s. If no wallet window opened, allow pop-ups and press again; nothing new was signed here.`), { timeout: true })), ms); })]).finally(() => clearTimeout(t)); };
 async function sign(receiverId, actions) {
   const hook = globalThis.__NC_WALLET_SIGN;
   if (typeof hook === 'function') {
-    const h = await hook(receiverId, actions);
-    noteFinal(h);
+    const h = await inTime(Promise.resolve(hook(receiverId, actions)), SIGN_WAIT_MS, 'The wallet');
+    rpc?.clear?.(); noteFinal(h);
     return h;
   }
-  const w = await conn.wallet();
-  const r = await w.signAndSendTransaction({ receiverId, actions });
+  const w = await inTime(conn.wallet(), 30_000, 'The wallet');
+  const r = await inTime(w.signAndSendTransaction({ receiverId, actions }), SIGN_WAIT_MS, 'The wallet');
   const h = W.txHashOf(r);
-  noteFinal(h);
+  rpc?.clear?.(); noteFinal(h);
   return h;
 }
 const fc = (methodName, args, tg = 40, deposit = '0') => ({ type: 'FunctionCall', params: { methodName, args, gas: (BigInt(tg) * TG).toString(), deposit } });

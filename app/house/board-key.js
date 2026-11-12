@@ -46,7 +46,7 @@ export function createBoardKeyPlugin({ contractId, methodNames, allowance }) {
       // The vault slot is the secret Refresh agent key writes. The plugin copy is only a fallback.
       const vault = localStorage.getItem(AGENT_LS(accountId));
       const key = keyFrom(vault || stored.privateKey);
-      const rpc = rpcClient(MAIN.rpc_fallbacks?.length ? [MAIN.rpc, ...MAIN.rpc_fallbacks] : [MAIN.rpc]);
+      const rpc = rpcClient([MAIN.rpc, ...(MAIN.rpc_fallbacks || []), ...((globalThis.NEARCARTA_NET?.net === 'mainnet' && globalThis.NEARCARTA_NET.rpc) || [])]); // F64: fall back past a 429
       const ak = await rpc('query', { request_type: 'view_access_key', finality: 'optimistic', account_id: accountId, public_key: key.publicKey }).catch(() => null);
       if (!ak?.permission?.FunctionCall) return next();
       const signed = signTx({

@@ -13,15 +13,22 @@ import bs58 from 'bs58';
 // A fallback keeps this bundle working if it is loaded before that module.
 const NETCFG = () => globalThis.NEARCARTA_NET || { net: 'mainnet', explorer: 'https://nearblocks.io', apiPath: '/api' };
 const MARKET = () => (globalThis.NEARCARTA_NET?.market || (NETCFG().net === 'testnet' ? 'arena.nearcarta.testnet' : 'arena.nearcarta.near'));
-const RPC = () => (NETCFG().net === 'testnet' ? 'https://rpc.testnet.fastnear.com' : 'https://free.rpc.fastnear.com');
+// F64: a list, so a 429 or a dead node moves to the next one instead of failing the read.
+const RPCS = () => (NETCFG().rpc?.length ? NETCFG().rpc : NETCFG().net === 'testnet' ? ['https://rpc.testnet.fastnear.com', 'https://rpc.testnet.near.org'] : ['https://free.rpc.fastnear.com', 'https://rpc.mainnet.fastnear.com', 'https://near.drpc.org']);
 const TG = 10n ** 12n;
 const API = () => (typeof window !== 'undefined' && window.NEARCARTA_API) || '';
 const privy = new Privy({ appId: __PRIVY_APP_ID__, ...(__PRIVY_CLIENT_ID__ ? { clientId: __PRIVY_CLIENT_ID__ } : {}), storage: new LocalStorage() });
 const isNear = (a) => a?.type === 'wallet' && a.chain_type === 'near' && typeof a.address === 'string';
 
 async function rpc(method, params) {
-  const r = await fetch(RPC(), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
-  const j = await r.json(); if (j.error) throw new Error(j.error.cause?.name || j.error.name || 'rpc'); return j.result;
+  let last = new Error('rpc');
+  for (const url of RPCS()) {
+    let r;
+    try { r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) }); } catch (e) { last = e; continue; }
+    if (r.status === 429 || r.status >= 500) { last = new Error('rpc http ' + r.status); continue; }
+    const j = await r.json(); if (j.error) throw new Error(j.error.cause?.name || j.error.name || 'rpc'); return j.result;
+  }
+  throw last;
 }
 export async function view(method, args = {}, contract = MARKET()) {
   const r = await rpc('query', { request_type: 'call_function', finality: 'final', account_id: contract, method_name: method, args_base64: Buffer.from(JSON.stringify(args)).toString('base64') });
