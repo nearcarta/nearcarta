@@ -277,7 +277,7 @@ async function stripClick(a, b) {
       if (GT.on()) { busy = true; flash = { shop: inShop, text: 'Sending one testnet transaction…' }; paintStrip(); try { real = await GT.step(step.id, { shop: Q.state(city).dark || 'ferry' }); } finally { busy = false; } }
       else if (R.on()) { busy = true; flash = { shop: inShop, text: 'One moment…' }; paintStrip(); try { real = await R.step(step.id, { shop: Q.state(city).dark || 'ferry' }); } finally { busy = false; } }
       else if (R.DEMO_STEPS.includes(step.id)) { busy = true; flash = { shop: inShop, text: 'One moment…' }; paintStrip(); try { real = await R.demo(step.id); } finally { busy = false; } }
-      const res = Q.act(city, inShop); if (real) { res.real = real; if (step.id === 'sell' && real.total != null && BigInt(real.total) > 0n) res.total = BigInt(real.total); }
+      const res = Q.act(city, inShop); if (real) { res.real = real; if (step.id === 'sell' && real.total != null && BigInt(real.total) > 0n) res.total = BigInt(real.total); if (step.id === 'sell' && real.before != null && real.after != null) { res.before = BigInt(real.before); res.after = BigInt(real.after); } }
       lastDone = { shop: inShop, step, res }; lastDeed = { shop: inShop, text: DEED[step.id] };
       save(); hud(); quest(); seal(b); whyOpen = false; flash = null; readPurse();
     } else if (a === 'why') whyOpen = !whyOpen;

@@ -202,6 +202,30 @@ export async function view(method, args = {}, contract) {
   return s.view(contract || cfg.shops.market || 'arena.nearcarta.testnet', method, args);
 }
 
+const FERRY_NODES = ['ferry-1', 'ferry-2', 'ferry-3'];
+// A node gives one unit at most once every 30 seconds (contracts/market/src/shops.rs gather).
+const GATHER_GAP_MS = 31_000;
+let lastGather = 0;
+const coinText = (y) => { const t = (BigInt(y || 0) * 10n) / 10n ** 20n; return `${t / 10n}.${t % 10n}`; };
+/** Gather and sell salt in rounds of three until the purse holds one share, at most three rounds. */
+async function topUpPurse({ rounds = 3 } = {}) {
+  let have = await purse();
+  let hash = null;
+  for (let k = 0; have != null && have < MILLI && k < rounds; k++) {
+    const wait = lastGather + GATHER_GAP_MS - Date.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    const g = await move(FERRY_NODES.map((node) => ({ method: 'gather', args: { node }, tgas: 15 })));
+    lastGather = Date.now();
+    hash = g?.hash || hash;
+    const q = await view('quote', { shop: 'arena', good: 'good:salt' });
+    const min = q?.sell ? (BigInt(q.sell) * 3n * 7n) / 10n : 1n;
+    const r = await move({ method: 'sell', args: { shop: 'arena', good: 'good:salt', qty: 3, min_total: String(min), keep: true }, tgas: 20 });
+    hash = r?.hash || hash;
+    await new Promise((r2) => setTimeout(r2, 1500));
+    have = await purse();
+  }
+  return { have, hash, short: have != null && have < MILLI };
+}
 const purse = async () => { try { const sq = await view('square', { account_id: account() }); return BigInt(sq?.purse ?? 0n); } catch { return null; } };
 
 /**
@@ -215,7 +239,8 @@ export async function step(id, ctx = {}) {
   // The guest pays no gas on market moves, but its market storage has to exist first.
   if (id === 'cargo') {
     // Three gathers through the relayer: each one mints NEP-245 salt to the guest.
-    const r = await move(['ferry-1', 'ferry-2', 'ferry-3'].map((node) => ({ method: 'gather', args: { node }, tgas: 15 })));
+    const r = await move(FERRY_NODES.map((node) => ({ method: 'gather', args: { node }, tgas: 15 })));
+    lastGather = Date.now();
     return record(id, 'Unloaded 3 salt at the Ferry (testnet)', r);
   }
   if (id === 'sell') {
@@ -226,11 +251,18 @@ export async function step(id, ctx = {}) {
     const r = await move({ method: 'sell', args: { shop: 'arena', good: 'good:salt', qty: n, min_total: String(min), keep: true }, tgas: 20 });
     await new Promise((r2) => setTimeout(r2, 1500));
     const after = await purse();
-    return record(id, `Sold ${n} salt at the Arena (testnet)`, { ...r, total: before != null && after != null ? after - before : null });
+    // The price line shows the Arena's real quote for one salt, before and after this sale.
+    const q2 = await view('quote', { shop: 'arena', good: 'good:salt' }).catch(() => null);
+    const price = q?.sell && q2?.sell ? { before: BigInt(q.sell), after: BigInt(q2.sell) } : {};
+    return record(id, `Sold ${n} salt at the Arena (testnet)`, { ...r, ...price, total: before != null && after != null ? after - before : null });
   }
   if (id === 'invest') {
     await ensureSession();
     const shop = ctx.shop || 'ferry';
+    // A share costs one milliNEAR (10 coins) from the purse. Every guest's sale leaves more salt on the
+    // Arena shelf, so three salt can fetch less than 10 coins; the purse is topped up with more salt first.
+    const top = await topUpPurse();
+    if (top?.short) return record(id, `Bought a ${shop} share (testnet)`, { hash: top.hash || null, failure: `ERR_PURSE_SHORT: ${coinText(top.have)} of 10 coins after selling more salt. The Arena is paying little for salt right now.` });
     const r = await move({ method: 'purse', args: { action: 'invest', amount: String(MILLI), shop }, tgas: 20 });
     return record(id, `Bought a ${shop} share (testnet)`, r);
   }
