@@ -902,6 +902,7 @@ const APPS = {
         orders: () => A.rowOrders(A.tollAcct(), A.S.me),
         rowAddress: () => A.tollRowAddress(),
         finished: () => A.tollFinished(),
+        finishedCached: () => A.tollFinishedCached(),
         onPay: (quote) => tollPay(quote),
         onFinish: (id) => tollFinish(id),
         onBroadcast: () => fetch(((globalThis.NEARCARTA_API || '').replace(/\/$/, '')) + netCfg().apiPath + '/toll/broadcast', { method: 'POST' }).then(r => r.json()).catch(() => ({ ok: false, text: 'The broadcast did not answer. Nothing moved on Base.' })),
