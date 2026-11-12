@@ -550,9 +550,9 @@ route.arm();
 // arena's Knight.glb (1.1 MB) is left cold to keep first-load wire under budget
 const WARM={ toll:['tiles/base/hex_grass','tiles/base/hex_water','buildings/blue/building_tower_base_blue','buildings/neutral/building_bridge_A','chars/Rogue_Hooded.glb'], chronicle:['tiles/base/hex_grass','decoration/props/crate_A_big'], bank:['decoration/props/crate_B_small','decoration/props/sack'], guard:['buildings/neutral/wall_straight_gate','decoration/props/barrel','decoration/props/bucket_arrows','decoration/props/target','decoration/props/weaponrack'],
   ferry:['decoration/props/crate_A_small'], arena:[], hall:['decoration/props/flag_blue'], house:[], payouts:[] };
-function warmRooms(){ if(navigator.connection?.saveData) return; const D8=new URL('../../D8_shops/',import.meta.url).href; const q=Object.entries(WARM).filter(([id])=>OPEN[id]);
+function warmRooms(){ if(navigator.connection?.saveData) return; const D8=new URL('../../D8_shops/',import.meta.url).href; const ORDER=['hall','ferry','toll','guard','arena','bank','payouts','house','chronicle']; /* F63: Market Day's order, so the next door is warm first */ const q=Object.entries(WARM).filter(([id])=>OPEN[id]).sort((a,b)=>ORDER.indexOf(a[0])-ORDER.indexOf(b[0]));
   const idle=f=>setTimeout(f,350);
-  const next=()=>{ if(!q.length) return; if(inShop){ setTimeout(()=>idle(next),1500); return; } const [id,ps]=q.shift(); Promise.all([import(D8+'js/core.js'),import(D8+'shops/'+id+'.js')]).then(([C8])=>Promise.all(ps.map(p=>C8.load(p.endsWith('.glb')?p:'hex/'+p).catch(()=>null)))).catch(()=>null).then(()=>idle(next)); };
+  const next=()=>{ if(!q.length) return; if(inShop){ setTimeout(()=>idle(next),1500); return; } const [id,ps]=q.shift(); Promise.all([import(D8+'js/core.js'),import(D8+'shops/'+id+'.js')]).then(([C8])=>C8.warm&&C8.ROOM_ASSETS?.[id]?C8.warm(id):Promise.all(ps.map(p=>C8.load(p.endsWith('.glb')?p:'hex/'+p).catch(()=>null)))).catch(()=>null).then(()=>idle(next)); };
   idle(next); }
 // first-render warm-up: build one room off screen, compile its shaders and draw one tiny hidden frame (shadow maps, fog, lights),
 // so the first door the visitor opens does not pay the one-off GPU program and upload cost

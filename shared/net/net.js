@@ -34,7 +34,8 @@ const D = {
   mainnet: {
     suffix: 'near',
     root: 'nearcarta.near',
-    rpc: ['https://free.rpc.fastnear.com', 'https://rpc.mainnet.near.org'],
+    // F64: more than one public node, so a 429 from one moves the read to the next (all allow CORS).
+    rpc: ['https://free.rpc.fastnear.com', 'https://rpc.mainnet.fastnear.com', 'https://near.drpc.org', 'https://rpc.mainnet.near.org'],
     archivalRpc: 'https://archival-rpc.mainnet.fastnear.com',
     explorer: 'https://nearblocks.io',
     explorerApi: 'https://api.nearblocks.io',
@@ -165,6 +166,7 @@ try {
     net: NET,
     explorer: cfg.explorer,
     apiPath: cfg.api,
+    rpc: cfg.rpc,
     mpc: cfg.mpc,
     base: cfg.base,
     market: cfg.shops.market || (NET === 'testnet' ? 'arena.nearcarta.testnet' : 'arena.nearcarta.near'),

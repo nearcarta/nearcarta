@@ -2,7 +2,7 @@
 import { rpcClient, viewFn } from '../../shared/vault/tx.js';
 import mainnetDep from '../../shared/deployments/mainnet.json' with { type: 'json' };
 
-const mainRpc = rpcClient([mainnetDep.rpc]);
+const mainRpc = rpcClient([mainnetDep.rpc, ...((globalThis.NEARCARTA_NET?.net === 'mainnet' && globalThis.NEARCARTA_NET.rpc) || [])]); // F64: fall back past a 429
 export const ARENA = mainnetDep.extras.arena.contract;
 export const DEED = mainnetDep.extras.house.contract;
 export const GUEST_ID = '';
