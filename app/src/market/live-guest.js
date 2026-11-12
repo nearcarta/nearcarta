@@ -395,7 +395,7 @@ export async function scamForce({ signer } = {}) {
     args: (nonce) => JSON.stringify({ payee, chain: 'near', asset: 'NEAR', amount: String(yocto), action_id: nonce, invoice: '' }),
   });
   const reason = reasonOf(r.failure);
-  // Only a cap refusal is the leash working. A signature or balance error is an outage, and the card says so.
+  // Only a cap refusal is the cap working. A signature or balance error is an outage, and the card says so.
   const refused = !!r.failure && CAP_REFUSAL.test(reason || '');
   const what = refused ? `The charter refused an over-limit payment: ${reason} (testnet)`
     : r.failure ? `The forced payment failed for another reason: ${reason} (testnet)`
