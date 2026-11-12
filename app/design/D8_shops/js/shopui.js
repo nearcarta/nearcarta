@@ -714,7 +714,7 @@ async function tollFinish(id) {
   }
   const hint = o.needsSignature ? (o.note || 'Not signed yet. Press Finish crossing again. No second pass is charged.') : (o.relay?.text || 'The relay did not answer. Nothing moved on Base.');
   extra.seal = hint;
-  const paid = !!o.relay?.ok || o.relay?.claim === 'paid';
+  const paid = o.relay?.claim === 'paid'; // F65: a broadcast is not a payment; the Base receipt is.
   if (paid) { if (sh?.act && runScene) runScene(sh.act({ success: true })); }
   return { ok: paid, o, tx: o.tx, hint, success: paid, crossing: true, baseTx: o.relay?.explorer || '', needsSignature: !!o.needsSignature, keep: true, kind: paid ? 'ok' : 'no', say: hint, rc: o.tx ? A.txLine(o.tx) : '' };
 }
@@ -901,6 +901,7 @@ const APPS = {
         // F61c: this row's crossings on the toll, and its own derived Base address.
         orders: () => A.rowOrders(A.tollAcct(), A.S.me),
         rowAddress: () => A.tollRowAddress(),
+        finished: () => A.tollFinished(),
         onPay: (quote) => tollPay(quote),
         onFinish: (id) => tollFinish(id),
         onBroadcast: () => fetch(((globalThis.NEARCARTA_API || '').replace(/\/$/, '')) + netCfg().apiPath + '/toll/broadcast', { method: 'POST' }).then(r => r.json()).catch(() => ({ ok: false, text: 'The broadcast did not answer. Nothing moved on Base.' })),
