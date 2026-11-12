@@ -1,7 +1,7 @@
 {
   "network": "testnet",
-  "status": "planned",
-  "note": "Placeholders only. The owner claims these accounts, funds them and deploys the wasm on the operator box; the keys stay there. Every account below is a sub-account of nearcarta.testnet, which the faucet creates first. Scripts read this file through shared/deployments/net.js, so a name is written once. Nothing here is a live address until the deploy steps below have run and their hashes are recorded.",
+  "status": "deployed",
+  "note": "Live on NEAR testnet since 2026-11-12. Contracts built from the stack head with rustc 1.86.0, cargo-near 0.22.0 and binaryen version_108 (market and mock_ft from contracts/artifacts). The keys stay on the operator box.",
   "rpc": "https://rpc.testnet.fastnear.com",
   "rpc_fallbacks": [
     "https://rpc.testnet.near.org",
@@ -17,14 +17,15 @@
   "keepalive": "Testnet contracts are left in place. Testnet NEAR has no value and the guest float is capped by the funding amount and the per-IP rate, not by reaping.",
   "play": {
     "account": "play.nearcarta.testnet",
-    "status": "not_deployed",
+    "status": "deployed",
     "role": "Guest funder and parent of every guest account. Holds a key separate from the root, so a leaked funder key can only spend the funder float.",
     "fund_near": 50,
-    "note": "Created with `near account create-account fund-myself play.nearcarta.testnet '\u2026 NEAR' autogenerate-new-keypair save-to-legacy-keychain sign-as nearcarta.testnet network-config testnet sign-with-legacy-keychain send`. Docs: https://docs.near.org/tools/cli"
+    "note": "Created with `near account create-account fund-myself play.nearcarta.testnet '\u2026 NEAR' autogenerate-new-keypair save-to-legacy-keychain sign-as nearcarta.testnet network-config testnet sign-with-legacy-keychain send`. Docs: https://docs.near.org/tools/cli",
+    "create_tx": "BhzvLrhu4xkrPDAf84cSibCh3HTDxZqv9mhdpkrRjRsc"
   },
   "relayer": {
     "account": "relayer.nearcarta.testnet",
-    "status": "not_deployed",
+    "status": "deployed",
     "role": "NEP-366 relayer float for the guest market moves.",
     "float_near": 2,
     "caps": {
@@ -32,23 +33,26 @@
       "per_visitor_relays_per_day": 40,
       "daily_near": 0.05,
       "sessions_per_day": 4
-    }
+    },
+    "create_tx": "F1nQzUGrwU4MCVVY21sFg4kQG95fjeuQu9amJLD4z4Tr"
   },
   "board": {
     "contract": "board.nearcarta.testnet",
     "owner": "nearcarta.testnet",
-    "status": "not_deployed",
+    "status": "deployed",
     "crate": "contracts/charter_board",
-    "wasm": "contracts/artifacts/charter_board.wasm",
+    "wasm": "built from contracts/charter_board at the stack head (network_of)",
     "init": "new() with no args",
     "max_row_yocto": "40000000000000000000000",
-    "note": "Built with the pinned toolchain in contracts/scripts/rebuild.sh (cargo-near 0.22.0). The board signs \"testnet\" into every propose_call_as message because its own account id ends in .testnet (contracts/charter_board/src/lib.rs `network_of`)."
+    "note": "Built with the pinned toolchain in contracts/scripts/rebuild.sh (cargo-near 0.22.0). The board signs \"testnet\" into every propose_call_as message because its own account id ends in .testnet (contracts/charter_board/src/lib.rs `network_of`).",
+    "create_tx": "BhX3erxSJ17a8Gvdh5z7RaaLEWCd6PWM4hyyRtTadoPn",
+    "init_tx": "4JyYRnpgsBS8xy1gUubUXfGbve6CbmouhN6FPnmjA4ka"
   },
   "market": {
     "contract": "arena.nearcarta.testnet",
     "owner": "nearcarta.testnet",
     "board": "board.nearcarta.testnet",
-    "status": "not_deployed",
+    "status": "deployed",
     "crate": "contracts/market",
     "wasm": "contracts/artifacts/market.wasm",
     "init": "new({owner, board, caps})",
@@ -58,56 +62,66 @@
       "city_payout_per_day": "2000000000000000000000000",
       "storage_min": "5000000000000000000000"
     },
-    "caps_note": "city_payout_per_day is 2 NEAR, not the mainnet 0.08, because every guest sells to the same keeper shops: at 0.08 the city float would run out after about 40 guests. set_caps is owner-only and needs no redeploy."
+    "caps_note": "city_payout_per_day is 2 NEAR, not the mainnet 0.08, because every guest sells to the same keeper shops: at 0.08 the city float would run out after about 40 guests. set_caps is owner-only and needs no redeploy.",
+    "create_tx": "4QQMRZBn4jSH8qiBj8At7MLRUaHVjfLn3vbMvp8Z9HGr",
+    "init_tx": "64ECewjtEPvPubnNgcFuwCxBkEfH9YWK7Y4kFJTfjNN1"
   },
   "guard": {
     "contract": "guard.nearcarta.testnet",
     "owner": "nearcarta.testnet",
-    "status": "not_deployed",
+    "status": "deployed",
     "crate": "contracts/guard",
     "wasm": "contracts/artifacts/guard.wasm",
-    "init": "new({board, hall})"
+    "init": "new({board, hall})",
+    "create_tx": "BpsLRdY3XBUeBFiQvcqkT6rozq9ka93xv5zujsPei263",
+    "init_tx": "DLeSyi1eLq7qyMjgZVauVszLZevyH3AsFg7rboZA8oES"
   },
   "townhall": {
     "contract": "townhall.nearcarta.testnet",
     "owner": "nearcarta.testnet",
-    "status": "not_deployed",
+    "status": "deployed",
     "crate": "contracts/hall",
     "wasm": "contracts/artifacts/hall.wasm",
-    "init": "new({owner, board, guard})"
+    "init": "new({owner, board, guard})",
+    "create_tx": "25gzUaYg5oZUcqeb8UjCwUWMYtfNg1kYzchg3qP8jhp9",
+    "init_tx": "GqrE8z5sS3t2W4PcLW8zuGdjQaCVzdqun8XjGqTHEBm2"
   },
   "house": {
     "contract": "house.nearcarta.testnet",
     "owner": "nearcarta.testnet",
-    "status": "not_deployed",
+    "status": "deployed",
     "crate": "contracts/house_nft",
-    "wasm": "contracts/artifacts/house_nft.v4.wasm",
+    "wasm": "built from contracts/house_nft at the stack head (new_with_board)",
     "init": "new_with_board({owner, board})",
-    "init_note": "The mainnet init `new({owner})` keeps its hardcoded board and is not touched. The testnet record names the board through `new_with_board`, so no name is hardcoded for a network."
+    "init_note": "The mainnet init `new({owner})` keeps its hardcoded board and is not touched. The testnet record names the board through `new_with_board`, so no name is hardcoded for a network.",
+    "create_tx": "9c9hyhsumVVKVuq4TrM1ZcZWyUd2mppx8n3xv1WEDSTh",
+    "init_tx": "5o6M5DCFKiWA1GJgpg7APctHurQDWMzgTWxE2CrtrRbW"
   },
   "tusdc": {
     "contract": "tusdc.nearcarta.testnet",
     "owner": "nearcarta.testnet",
-    "status": "not_deployed",
+    "status": "deployed",
     "crate": "contracts/mock_ft",
     "wasm": "contracts/artifacts/mock_ft.wasm",
     "init": "new()",
     "decimals": 6,
-    "note": "NEP-141 test dollars for the welcome crate and the Payouts step. `mint` is open, so the funder can fill a guest's balance in one call."
+    "note": "NEP-141 test dollars for the welcome crate and the Payouts step. `mint` is open, so the funder can fill a guest's balance in one call.",
+    "create_tx": "4WFQdQaoaii2TQe45bcPh6V7MrzN6CGWY2NfqgL6ZA6g",
+    "init_tx": "EN1AzB3d9wUbQi7saYSdz9K8nDv15oK3ZeU7jA9cvHDL"
   },
   "toll": {
     "contract": "toll.nearcarta.testnet",
     "owner": "nearcarta.testnet",
-    "status": "not_deployed",
+    "status": "deployed",
     "crate": "contracts/toll",
-    "wasm": "contracts/artifacts/toll.v9.wasm",
+    "wasm": "built from contracts/toll at the stack head",
     "init": "new({owner, mpc, path, chain_id, foreign_address, fx_root_key, allow_to, max_per_tx, budget, max_fee_cap, verify_chain, token, dao, gate}) then set_price({board, fee, cost, splits, paused, usdc, max_token, hold_ns})",
     "mpc": "v1.signer-prod.testnet",
     "chain_id": 84532,
     "path": "base-1",
-    "derived_public_key": "",
-    "foreign_address": "",
-    "fx_root_key": "",
+    "derived_public_key": "secp256k1:3t2c3q5uQm6R9CSxGa6CCjQfyLmrcGiGnCpHXP9BNrKSRs4k1YdAcimmaLEELNtjF4nRgpB1UHPHapC2TftHuA5Y",
+    "foreign_address": "0xcadf7b9c869d59faa69dff8c40dc929bca024c27",
+    "fx_root_key": "secp256k1:3t2c3q5uQm6R9CSxGa6CCjQfyLmrcGiGnCpHXP9BNrKSRs4k1YdAcimmaLEELNtjF4nRgpB1UHPHapC2TftHuA5Y",
     "price": {
       "board": "board.nearcarta.testnet",
       "fee": "1000000000000000000000",
@@ -120,7 +134,10 @@
     },
     "note": "The three empty fields are filled from `v1.signer-prod.testnet` `derived_public_key` with path base-1 and predecessor toll.nearcarta.testnet, read with a view call before the deploy. chain_id 84532 is Base Sepolia; contracts/toll/src/lib.rs `new` accepts 8453 or 84532.",
     "broadcast": false,
-    "broadcast_note": "`toll.cross` and `toll.sign_cross` run a real Chain Signatures request against v1.signer-prod.testnet and store the signature on chain. The backend does not send it to Base Sepolia: there is no funded Base Sepolia key, and the UI says the transaction is signed and not broadcast. Everything on the NEAR side is real and linked on testnet nearblocks."
+    "broadcast_note": "`toll.cross` and `toll.sign_cross` run a real Chain Signatures request against v1.signer-prod.testnet and store the signature on chain. The backend does not send it to Base Sepolia: there is no funded Base Sepolia key, and the UI says the transaction is signed and not broadcast. Everything on the NEAR side is real and linked on testnet nearblocks.",
+    "create_tx": "99iqXycLVxQqbr95Zo2NEE8Fa9mEDjPW7HMCU4VVi3zG",
+    "init_tx": "FkkfTJuXH5PsHLwGeYbW8JjQpHS78dVZi1BPaiMBMDNs",
+    "set_price_tx": "8TLkQswMwhFFWVMrgbYNFqC3GqszYYceWZz72ykYi4Vs"
   },
   "mpc": "v1.signer-prod.testnet",
   "chain_id": 84532,
@@ -140,7 +157,7 @@
     "usdc_testnet": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af"
   },
   "keepers": {
-    "status": "not_deployed",
+    "status": "deployed",
     "pattern": "keeper-<shop>.nearcarta.testnet",
     "shops": [
       "arena",
@@ -153,7 +170,7 @@
       "payouts",
       "chronicle"
     ],
-    "note": "Seeded by scripts/keepers-deploy.js with NEAR_NETWORK=testnet. Each keeper is a real testnet account with a board row and a market shop, so the NPC work in the guest story is a real transaction."
+    "note": "Seeded by scripts/keepers-deploy.js with NEAR_NETWORK=testnet (steps keys, accounts, rows, market). Each keeper has a board row and a market shop."
   },
   "planned": {
     "board": "board.nearcarta.testnet",
@@ -177,7 +194,7 @@
     "caps": {
       "per_ip_day": 3,
       "global_day": 400,
-      "funder_floor_near": 10
+      "funder_floor_near": 2
     },
     "note": "The account name is base32(sha256(public_key))[0..10] plus the parent, so a retry is idempotent. The secret key never leaves the browser.",
     "row": {
@@ -193,11 +210,11 @@
       "per_action_cap": "5000000000000000000000",
       "daily_budget": "20000000000000000000000",
       "max_actions_per_day": 8,
-      "row_fund": "1000000000000000000000",
-      "row_deposit": "40000000000000000000000",
-      "calls_deposit": "5000000000000000000000",
+      "row_fund": "15000000000000000000000",
+      "row_deposit": "60000000000000000000000",
+      "calls_deposit": "50000000000000000000000",
       "method": "propose",
-      "note": "The guest defaults for /setup. Built from testnet.json's shops so no account name is written twice. 0.005 per action, 0.02 a day, 8 actions, 0.001 spendable in the row."
+      "note": "The guest defaults for /setup. 0.005 per action, 0.02 a day, 8 actions. 0.015 is spendable in the row: the order (0.001), the toll fee (0.001), the honest payment (0.0001) and the storage of each held call come out of it."
     }
   },
   "oneclick": "https://1click.chaindefuser.com",
@@ -232,7 +249,7 @@
     "keeper-payouts": "keeper-payouts.nearcarta.testnet",
     "keeper-chronicle": "keeper-chronicle.nearcarta.testnet",
     "tollTo": "keeper-toll.nearcarta.testnet",
-    "lookalike": "keeper-guard.nearcarta.testnet0",
-    "note": "The shop names a guest row may reach. app/src/net/net.js publishes this map on the page, so no page hardcodes an account id. `lookalike` is a real, separate testnet account registered by the operator so the Guardhouse step can refuse it on chain; it is not a payee of any other shop."
+    "lookalike": "keeper-gaurd.nearcarta.testnet",
+    "note": "The shop names a guest row may reach. shared/net/net.js publishes this map on the page, so no page hardcodes an account id. `lookalike` is a typo-squat of the guard keeper that is on no row's receiver list: the board refuses a payment to it on chain (receiver_not_allowlisted) before any NEAR moves."
   }
 }

@@ -94,6 +94,7 @@ export function welcomeMarkup({ account, start, crate } = {}) {
     item('3 salt', null, 'minted by the Ferry on your first step'),
   ];
   return `<div class="welcome" data-testid="welcome-card" role="region" aria-label="Your free test account">
+    <button type="button" class="w-close" data-testid="welcome-close" aria-label="Close">×</button>
     <p class="w-title">Your test account is ready</p>
     <p class="w-acct"><b>${esc(account || '')}</b> · <a href="${addrUrl(account || '')}" target="_blank" rel="noopener">open on the explorer ↗</a></p>
     <ul class="w-items">${items.join('')}</ul>
@@ -110,15 +111,26 @@ export async function mintDeed({ doc = document } = {}) {
   if (!s) { if (note) note.textContent = 'No test account in this browser yet.'; return null; }
   const house = cfg.shops.house || (NET === 'testnet' ? 'house.nearcarta.testnet' : 'house.nearcarta.near');
   if (note) note.textContent = 'Signing…';
-  const r = await s.call(house, 'mint_deed', {}, { deposit: 3n * 10n ** 22n, gas: 60n * 10n ** 12n });
+  const r = await s.call(house, 'mint_deed', {}, { deposit: 3n * 10n ** 22n, gas: 60n * 10n ** 12n }).catch((e) => ({ hash: null, failure: String(e?.message || e) }));
   const ok = !r.failure && r.hash;
   if (note) {
     note.innerHTML = ok
       ? `Your deed is minted on testnet. <a href="${txUrl(r.hash)}" target="_blank" rel="noopener">View ↗</a>`
-      : 'The deed was not minted this time. The rest of the city still works.';
+      : `The deed was not minted this time (${esc(String(r.failure || 'no receipt').replace(/^.*panicked: /, '').slice(0, 80))}). The rest of the city still works.`;
   }
   return r;
 }
+
+/** The same page on testnet, asking it to start Try free on arrival. */
+export function tryFreeUrl() {
+  const u = new URL(switchUrl('testnet'), 'https://x.invalid');
+  u.searchParams.set('try', '1');
+  return u.pathname + u.search + u.hash;
+}
+const wantsTryFree = () => { try { return new URLSearchParams(globalThis.location?.search || '').get('try') === '1'; } catch { return false; } };
+const dropTryParam = () => {
+  try { const u = new URL(globalThis.location.href); u.searchParams.delete('try'); globalThis.history?.replaceState(null, '', u.pathname + u.search + u.hash); } catch { /* not a browser */ }
+};
 
 /** Start the whole guest path: key, account, crate, card. */
 export async function startTryFree({ doc = document, onDone } = {}) {
@@ -158,6 +170,8 @@ export function showWelcomeCard({ doc = document, start, crate, fresh = false } 
   wrap.innerHTML = welcomeMarkup({ account: start?.account || rec?.account, start, crate });
   doc.body.append(wrap);
   wrap.querySelector('[data-testid="mint-deed"]')?.addEventListener('click', () => mintDeed({ doc }));
+  // The card is a greeting, not a wall: it closes, and the badge reopens the account sheet.
+  wrap.querySelector('[data-testid="welcome-close"]')?.addEventListener('click', () => wrap.remove());
   if (fresh) startTryFree({ doc });
   return wrap;
 }
@@ -182,14 +196,21 @@ export function installNetChrome({ doc = document } = {}) {
   bar.innerHTML = `<a id="tryFree" class="btn-gold" data-testid="try-free" href="#" role="button">
       <span class="k" aria-hidden="true">✦</span><span class="lab">Try free</span>
     </a>
-    <a id="signIn" class="btn-outline" data-testid="sign-in" href="/setup/" title="Sign in with email and set the rules your agent cannot break">Play for real</a>
+    <a id="signIn" class="btn-outline" data-testid="sign-in" href="/setup/?net=mainnet" title="Sign in with email and set the rules your agent cannot break">Play for real</a>
     <a class="btn-quiet" data-testid="watch-story" href="/?story=1" title="Watch the thirty-second opening story">Watch the story</a>
     ${badgeMarkup()}
     <p id="tryFreeNote" class="try-note" data-testid="try-free-note" aria-live="polite"></p>`;
   const badge = doc.getElementById('netBadge');
   badge?.addEventListener('click', (e) => { e.preventDefault(); openSheet({ doc, rec: guestRecord() }); });
-  doc.getElementById('tryFree')?.addEventListener('click', (e) => { e.preventDefault(); startTryFree({ doc }); });
+  doc.getElementById('tryFree')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    // Try free is a testnet account. From a mainnet page it moves to the same page on testnet and starts
+    // there, instead of offering practice mode: the free account is the point of the button.
+    if (NET !== 'testnet') { globalThis.location?.assign(tryFreeUrl()); return; }
+    startTryFree({ doc });
+  });
   // A returning guest lands straight back in their own account, with the card already open.
   if (NET === 'testnet' && hasGuest() && rec?.account) showWelcomeCard({ doc });
+  else if (NET === 'testnet' && wantsTryFree()) { dropTryParam(); startTryFree({ doc }); }
   return bar;
 }

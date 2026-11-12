@@ -245,7 +245,7 @@ export function makeApp() {
     // `network` names the service: the testnet image answers "testnet" here, so an operator can see at a
     // glance which record this process is reading. The mainnet service keeps saying "mainnet".
     return c.json({ ...(c.req.query('deep') ? await deepHealth() : {}), ok: true, client_ip_from: clientIpSource(c)[0], network: { name: NET, contracts: NET === 'testnet' ? (DEP.status === 'deployed' ? 'testnet' : null) : (MAINNET_DEP?.status === 'deployed' ? 'mainnet' : null), journey: NET }, near,
-      features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false }, vault_runner: { enabled: false, charter: MAINNET_DEP?.extras?.arena?.contract || null }, git: process.env.GIT_SHA || null });
+      features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false }, vault_runner: { enabled: false, charter: NET === 'testnet' ? null : (MAINNET_DEP?.extras?.arena?.contract || null) }, git: process.env.GIT_SHA || null });
   });
   // Shows the caller how Render keys their own request, with no address in the answer: which header decides
   // the client key, a short keyed tag of that key (the same client gets the same tag until the process
@@ -260,7 +260,9 @@ export function makeApp() {
     for (const n of IP_HEADERS) if (raw.get(n)) seen[n] = n === 'x-vercel-ip-country' ? 'set' : `${raw.get(n).split(',').length} hop(s)`;
     return c.json({ client_ip_from: from, client_tag: ipTag(ip), shared_cap: egress ? 'egress:' + ipTag(egress) : null, proxy_verified: proxyVerified(c), ip_headers: seen, header_names: [...raw.keys()].filter(n => !IP_HEADERS.includes(n)).sort() });
   });
-  app.get('/api/deployments', limiter(30), c => c.json(MAINNET_DEP || { status: 'not_deployed' }));
+  // The record of the network this service runs on: the guest page reads its shop names from it, so the
+// testnet service must not hand out mainnet accounts.
+app.get('/api/deployments', limiter(30), c => c.json((NET === 'testnet' ? DEP : MAINNET_DEP) || { status: 'not_deployed' }));
   // The deployments record is a file, not a chain read: cached at the edge and in this process,
   // so the tray's per-account ask does not cost a route call each time.
   app.get('/api/mainnet', limiter(120), edgeCache(60), c => c.json(deploymentsBody()));

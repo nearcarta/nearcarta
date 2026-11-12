@@ -4,7 +4,7 @@
 // Docs: https://docs.near.org/protocol/accounts-contracts/account-id · https://docs.near.org/protocol/accounts-contracts/access-keys
 //       https://docs.near.org/tools/near-api · https://docs.near.org/getting-started/faucet
 import { NET } from './config.js';
-import { clientIp } from './http-guard.js';
+import { clientIdentity, EGRESS_MULT } from './http-guard.js';
 import * as guest from './guest.js';
 
 /** Per-IP per-day counters with a persisted day key, so a restart mid-day does not reset the quota. */
@@ -42,6 +42,9 @@ export function register(app, { limiter, globalCap }) {
   const perIp = new Map();
   const ipCap = dayCounter({ limit: cfg.perIpDay, name: 'guest-ip', store: perIp });
   const dayCap = globalCounter({ limit: cfg.globalDay });
+  // A caller that reaches the service directly can type the visitor-IP header. Its real connecting
+  // address then gets its own day bucket at EGRESS_MULT x the per-IP limit, as the other quotas do.
+  const egressCap = dayCounter({ limit: cfg.perIpDay * EGRESS_MULT, name: 'guest-egress' });
 
   app.post('/api/guest/start', limiter(20), async (c) => {
     if (NET !== 'testnet') return c.json({ error: 'not found' }, 404);
@@ -50,8 +53,9 @@ export function register(app, { limiter, globalCap }) {
     if (!(await guest.turnstileOk(body?.turnstile))) {
       return c.json({ error: 'ERR_TURNSTILE', why: 'ERR_TURNSTILE', retry: 'Press Try free again.' }, 403);
     }
-    const ip = clientIp(c);
-    const r = await guest.start(body || {}, { caps: { take: (k) => ipCap.take(ip || k), global: () => dayCap() } });
+    const [, ip, egress] = clientIdentity(c);
+    const take = (k) => ipCap.take(ip || k) || (egress ? egressCap.take(egress) : null);
+    const r = await guest.start(body || {}, { caps: { take, global: () => dayCap() } });
     return c.json(r, r.ok === false && r.status ? r.status : 200);
   });
 

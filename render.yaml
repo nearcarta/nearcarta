@@ -65,7 +65,7 @@ services:
       - key: GUEST_GLOBAL_DAY
         value: "400"
       - key: GUEST_FUNDER_FLOOR_NEAR
-        value: "10"
+        value: "2"
       - key: GUEST_FUND_NEAR
         value: "0.25"
       # The NEP-366 relayer that pays the gas for a guest's market moves.
