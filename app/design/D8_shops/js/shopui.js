@@ -216,7 +216,7 @@ function ferryPlainReason(reason) {
   if (/key_cannot_propose_call/i.test(raw)) return 'your agent key cannot call propose_call yet';
   if (/NotEnoughAllowance/i.test(raw)) return 'the session key does not have enough gas allowance for this ask';
   if (/doesn't have enough balance|does not hold enough wNEAR/i.test(raw)) {
-    return 'the wrap account does not hold enough wNEAR for this transfer; Load cargo again to use the stranded wNEAR';
+    return 'the board\'s wrap.near account did not hold the wNEAR this transfer needed; Load cargo again to wrap fresh NEAR from your row';
   }
   const plain = String(A.plainError(raw) || '').replace(/\s+/g, ' ').trim();
   if (!plain || /[{"]|account_id|send_tx|InvalidTx|public_key|yocto/i.test(plain)) return 'the charter did not accept this ask';
@@ -324,6 +324,23 @@ function watchFerryDeposit(address) {
   tick();
   ferryWatch = setInterval(tick, 4000);
 }
+/** The row would refuse this wrap. Nothing was signed; say which rule and what would fit. */
+function rowRefusesWrap(plan, o, clause) {
+  sh?.hideRefuse?.();
+  sh?.setOrder?.('quoted');
+  extra.depositAddress = '';
+  extra.depositMode = '';
+  extra.charterNote = plan.why;
+  extra.landedLinks = [];
+  extra.renewSetup = false;
+  return {
+    kind: 'no', o, hero: APPS.ferry.hero(),
+    say: `${esc(plan.why)} <a href="/setup/?shop=ferry" data-testid="ferry-row-setup">Open /setup</a>`,
+    rc: (o?.tx ? A.txLine(o.tx) : '') + '<span class="rc" data-testid="ferry-order-state">order · refused before signing</span>',
+    rule: o ? A.ruleFor(o, clause) : '',
+    agentHint: plan.why, agentLinks: [], lowGas: false,
+  };
+}
 /** Guest is a labeled demo. A session stamp plus a ≤ $0.20 checkout may propose_call. Delivered only after SUCCESS. */
 async function settleFerry(wantCharter) {
   const pair = APPS.ferry.pairFromState();
@@ -393,23 +410,26 @@ async function settleFerry(wantCharter) {
       rule: A.ruleFor(o, clause),
     };
   }
-  // Read wrap.near before planning: first near_deposit keeps 0.00125 for board storage,
-  // and a prior failed ft_transfer can leave stranded wNEAR on the board.
+  // Read wrap.near before planning: an unregistered board keeps 0.00125 of its first
+  // near_deposit for storage. Its wNEAR balance is NOT read as this row's: every row shares
+  // the board's one wrap.near account, so each swap wraps the row's own NEAR first.
   let wrap = { registered: true, balanceYocto: '0' };
   if (nearNative(pair.from) && A.S.board) {
     try { wrap = await A.wrapBoardState(); }
     catch { wrap = { registered: true, balanceYocto: '0' }; }
   }
-  const spend = nearNative(pair.from)
-    ? pickWrapSpend({ wantAmount: pair.amt, wrapBalanceYocto: wrap.balanceYocto })
-    : { amount: pair.amt, amountYocto: null, recover: false };
-  let spendPair = pair;
-  if (spend.recover && String(spend.amount) !== String(pair.amt)) {
-    spendPair = { ...pair, amt: spend.amount };
-    try {
-      const q2 = await A.quotePair(spendPair.from, spendPair.to, spendPair.amt, spendPair.receiveAt);
-      if (q2) extra.q = q2;
-    } catch { /* keep the prior quote; checkout still uses spendPair.amt */ }
+  const spend = pickWrapSpend({ wantAmount: pair.amt });
+  const spendPair = pair;
+  // Check the whole wrap against the row BEFORE asking 1Click for an address: smallest
+  // payment, per-payment cap, today's budget, payments left and the row balance. The worst
+  // case (the deposit address still needs wrap.near storage) is the one checked.
+  const liveRow = nearNative(pair.from) ? await A.freshBoardRow().catch(() => null) : null;
+  if (liveRow && spend.amountYocto) {
+    const pre = depositPlan({
+      from: pair.from, amount: pair.amt, depositAddress: 'pending.near', wrapRegistered: wrap.registered,
+      depositAccountRegistered: false, row: liveRow,
+    });
+    if (pre.kind === 'row-refuses') return rowRefusesWrap(pre, o, clause);
   }
   const cap = mayCheckout(extra.q);
   const stamp = o
@@ -455,10 +475,11 @@ async function settleFerry(wantCharter) {
     capYocto: A.S.boardRow?.per_action_cap || null,
     balanceYocto: A.S.boardRow?.balance || null,
     wrapRegistered: wrap.registered,
-    wrapBalanceYocto: wrap.balanceYocto,
     depositAccountRegistered,
+    row: liveRow,
   });
   sh?.hideRefuse?.();
+  if (plan.kind === 'row-refuses') return rowRefusesWrap(plan, o, clause);
   const waiting = '<span class="rc" data-testid="ferry-order-state">order · waiting</span>';
   if (plan.kind === 'propose_call') {
     let sent = null;
@@ -487,7 +508,6 @@ async function settleFerry(wantCharter) {
         amount: nearAmount(plan.transferYocto) || spendPair.amt,
         landed: sent?.landed || [],
         failedReason: sent?.reason || '',
-        stranded: !!plan.recover,
       });
       extra.charterNote = note.text;
       extra.renewSetup = !!note.lowGas;
