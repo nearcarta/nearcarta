@@ -60,3 +60,20 @@ test('the one click and the scam errand load the guest story module from where t
     }
   }
 });
+
+test('a mainnet page never shows a dead button: Try free, the loop and the errand each lead to testnet', () => {
+  const run = read('app/src/judges-run.js');
+  const chrome = read('app/src/net/chrome.js');
+  // The loop: on mainnet the button is a link to the same page on testnet with run=1, which starts it.
+  assert.match(run, /data-testid="run-loop-switch" href="\$\{esc\(runUrl\(\)\)\}"/);
+  assert.match(run, /searchParams\.set\('run', '1'\)/);
+  assert.match(run, /searchParams\.get\('run'\) === '1'/);
+  // Try free from a mainnet page moves to testnet with try=1 and starts there, instead of practice mode.
+  assert.match(chrome, /if \(NET !== 'testnet'\) \{ globalThis\.location\?\.assign\(tryFreeUrl\(\)\)/);
+  assert.match(chrome, /searchParams\.set\('try', '1'\)/);
+  assert.match(chrome, /wantsTryFree\(\)\) \{ dropTryParam\(\); startTryFree/);
+  // Play for real is pinned to mainnet.
+  assert.match(chrome, /data-testid="sign-in" href="\/setup\/\?net=mainnet"/);
+  // The errand on mainnet links to itself on testnet.
+  assert.match(read('app/src/net/scam.js'), /data-testid="scam-switch" href=/);
+});

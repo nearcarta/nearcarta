@@ -8,7 +8,7 @@
 //
 // Docs: https://docs.near.org/protocol/transactions/meta-tx · https://docs.near.org/tools/near-api
 //       https://api-testnet.nearblocks.io/api-docs
-import { NET, txUrl, addrUrl } from '../../../shared/net/net.js';
+import { NET, txUrl, addrUrl, switchUrl } from '../../../shared/net/net.js';
 import { startGuest, welcomeCrate, guestSigner, forgetGuest, whyText } from '../guest/key.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -81,6 +81,13 @@ export function stoppedText(r) {
   return `Stopped at “${bad.label}”${bad.note ? `: ${bad.note}` : ''}. The steps marked ✓ are real testnet transactions.`;
 }
 
+/** This page on testnet, asking it to start the loop on arrival (one click from a mainnet page). */
+export function runUrl() {
+  const u = new URL(switchUrl('testnet'), 'https://x.invalid');
+  u.searchParams.set('run', '1');
+  return u.pathname + u.search + u.hash;
+}
+
 /** The markup for the runner: one button, then one row per step. */
 export function judgeRunnerMarkup() {
   const net = NET === 'testnet' ? 'TESTNET' : 'MAINNET';
@@ -89,8 +96,10 @@ export function judgeRunnerMarkup() {
     <p class="jr-net"><span class="qs-net-pill" data-testid="judge-pill">${net}</span>
       ${canRun()
         ? 'One click makes a throwaway testnet account and runs the whole loop with real transactions. Every hash below opens on the testnet explorer.'
-        : 'This page is on mainnet, so the free loop is off. Add <code>?net=testnet</code> to the URL to run it on the test network.'}</p>
-    <button type="button" class="btn-gold" data-testid="run-loop"${disabled}>Run the loop on testnet</button>
+        : 'This page is on mainnet, so the free loop runs on the test network instead. The button opens this page on testnet (<code>?net=testnet</code>) and starts it.'}</p>
+    ${canRun()
+      ? `<button type="button" class="btn-gold" data-testid="run-loop"${disabled}>Run the loop on testnet</button>`
+      : `<a class="btn-gold" data-testid="run-loop-switch" href="${esc(runUrl())}">Run the loop on testnet</a>`}
     <p class="jr-note" data-testid="run-loop-note" aria-live="polite"></p>
     <ol class="jr-steps" data-testid="run-steps"></ol>
   </div>`;
@@ -113,7 +122,7 @@ export function installJudgeRunner({ doc = document } = {}) {
     li.innerHTML = `<b aria-hidden="true">${word}</b> <span>${esc(s.label)}</span>${s.account ? ` <code>${esc(s.account)}</code>` : ''}${s.url ? ` <a href="${esc(s.url)}" target="_blank" rel="noopener">open ↗</a>` : ''}${s.note ? ` <small>${esc(s.note)}</small>` : ''}`;
     if (prev) prev.replaceWith(li); else list.append(li);
   };
-  host.querySelector('[data-testid="run-loop"]').addEventListener('click', async (e) => {
+  host.querySelector('[data-testid="run-loop"]')?.addEventListener('click', async (e) => {
     const btn = e.currentTarget;
     btn.disabled = true;
     list.innerHTML = '';
@@ -124,5 +133,14 @@ export function installJudgeRunner({ doc = document } = {}) {
       : stoppedText(r);
     btn.disabled = false;
   });
+  // Arrived from the mainnet page's button: run once, then drop the flag so a reload does not rerun.
+  try {
+    const u = new URL(globalThis.location.href);
+    if (canRun() && u.searchParams.get('run') === '1') {
+      u.searchParams.delete('run');
+      globalThis.history?.replaceState(null, '', u.pathname + u.search + u.hash);
+      host.querySelector('[data-testid="run-loop"]')?.click();
+    }
+  } catch { /* not a browser */ }
   return host;
 }
