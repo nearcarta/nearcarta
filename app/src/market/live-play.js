@@ -13,10 +13,35 @@ export const live = load();
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(live)); } catch {} };
 export const on = () => !!live.account;
 
+// A Privy session already in this browser: /setup's Google or email sign-in uses the same Privy app
+// and the same LocalStorage, so its token keys are here. Checked before the signing bundle loads, so a
+// visitor who never signed in does not download it.
+export const hasPrivySession = (ls = globalThis.localStorage) => {
+  try { return !!(ls && (ls.getItem('privy:token') || ls.getItem('privy:refresh_token'))); } catch { return false; }
+};
+const onTestnet = () => globalThis.NEARCARTA_NET?.net === 'testnet';
+
+/**
+ * Pick up who is signed in. A visitor who signed in on /setup (Google or email) is already signed in
+ * here: the same account plays, with no second account and no email code. On testnet the guest path
+ * owns the day, so nothing is adopted there.
+ */
 export async function resume() {
-  if (!live.account) return null;
-  try { const a = await (await lib()).current(); if (a !== live.account) { live.account = null; save(); } } catch { /* keep the record; signing asks again */ }
+  if (!live.account && (onTestnet() || !hasPrivySession())) return null;
+  let a;
+  try { a = await (await lib()).current(); } catch { return live.account; /* keep the record; signing asks again */ }
+  if (live.account && a === live.account) return live.account;
+  if (live.account && a !== live.account) { live.account = null; save(); }
+  if (a && !onTestnet()) await adopt(a);
   return live.account;
+}
+async function adopt(account) {
+  live.account = account; live.txs ||= []; save();
+  try {
+    const s = await (await lib()).ensureSession();
+    for (const h of s?.txs || []) if (h) live.txs.push({ step: 'open', what: 'Wallet opened by the city', hash: h });
+    save();
+  } catch { /* the first move asks the relayer again */ }
 }
 export async function sendCode(email) { await (await lib()).sendCode(email); }
 /** Log in, then the relayer opens the wallet (once). Returns the account. */

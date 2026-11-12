@@ -403,8 +403,11 @@ function vSign() {
     ? `<input type="email" required autocomplete="email" placeholder="you@example.com" aria-label="Email" data-testid="md-email" value="${esc(signEmail)}"><button type="submit" class="md-gold" data-testid="md-send">Send code</button>`
     : signStage === 'code' ? `<input inputmode="numeric" required autocomplete="one-time-code" placeholder="Code from your email" aria-label="Code" data-testid="md-code"><button type="submit" class="md-gold" data-testid="md-login">Start</button>`
     : '<p class="md-hint" role="status">One moment…</p>';
-  return head(ICON.coin, 'Play for real', 'Your email opens your purse. No wallet, no fees.')
-    + `<form class="md-sign" data-testid="md-sign">${f}</form>${signErr ? `<p class="md-hint no" role="alert">${esc(signErr)}</p>` : ''}`
+  // Google goes through /setup's sign-in (the same Privy app) and comes straight back here; resume()
+  // then adopts that session, so it is the same account and no code is asked for.
+  const google = signStage === 'email' ? `<a class="md-ghost md-google" data-testid="md-google" href="/setup/?google=1&next=${encodeURIComponent(location.pathname + location.search)}">Continue with Google</a><p class="md-hint">or use your email</p>` : '';
+  return head(ICON.coin, 'Play for real', 'Google or your email opens your purse. No wallet, no fees.')
+    + google + `<form class="md-sign" data-testid="md-sign">${f}</form>${signErr ? `<p class="md-hint no" role="alert">${esc(signErr)}</p>` : ''}`
     + '<button type="button" class="md-ghost sm" data-act="practice" data-testid="md-practice">Practice first</button>';
 }
 root.addEventListener('submit', async (e) => {
