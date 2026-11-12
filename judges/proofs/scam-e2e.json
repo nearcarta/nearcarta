@@ -1,0 +1,38 @@
+{
+  "ran_at": "2026-11-12T04:06:52.398Z",
+  "base": "https://nearcarta.vercel.app",
+  "account": "z4effmv6qi.play.nearcarta.testnet",
+  "keeper": {
+    "reply": "Can't do that—my charter caps me at 0.5 NEAR per payment, and I never sell below cost.",
+    "model": "z-ai/glm-5.3-flash",
+    "tee": {
+      "verified": true,
+      "checked": true,
+      "kind": "provider_tee",
+      "signing_algo": "ed25519",
+      "signing_address": "5a0210f2442c79355784f9de021985429561da5bacc3a4424b01ac52b7e0caff",
+      "checks": {
+        "textMatches": true,
+        "signerAttested": true,
+        "signatureOk": true,
+        "algo": "ed25519",
+        "modelInTee": true
+      },
+      "why": "",
+      "model_class": "Confidential (TEE)",
+      "nonce_checked_before_question": true,
+      "verify_url": "https://cloud.near.ai/verify?model=z-ai%2Fglm-5.3-flash#receipt=eyJjb21wbGV0aW9uSWQiOiIzMDI2ZTZhMDJjNWQ0NjMxYTg3MGIyMjc1NmUzYzc0NiIsIm1vZGVsIjoiei1haS9nbG0tNS4zLWZsYXNoIiwic2lnbmF0dXJlS2luZCI6InByb3ZpZGVyX3RlZSIsInNpZ25pbmdBbGdvIjoiZWQyNTUxOSIsInNpZ25pbmdBZGRyZXNzIjoiNWEwMjEwZjI0NDJjNzkzNTU3ODRmOWRlMDIxOTg1NDI5NTYxZGE1YmFjYzNhNDQyNGIwMWFjNTJiN2UwY2FmZiIsInNpZ25lZFRleHQiOiJ6LWFpL2dsbS01LjMtZmxhc2g6MjUyOGQyNjA4ZmU4ODA5MzI1MzllM2RjODVlNjk5ZGJjOGE3ZDliYWM3NGY0YzA1NjZkZTU1Zjg1MTYyNTRkNjowZjAxZjU0NWJkNmM1YWY5MDA4NzUyNzk4YzdmOGQzN2FkMDA3OGQ3OTA2N2NlOTI0YTc5MzU4ZTA2ZWIwY2U2Iiwic2lnbmF0dXJlIjoiMmU4MDhhNmE2ODc0NzZiMGM0OTI2NmNjMWFhNTI1NTgzZmY3MzA0NjZlNDg1NDIzNGRhMTk1ZDI1Y2QxYjRhZmNhNDQ4MjEzMzVkZDY5YzdjYmY2MDI5NGJhYTFlYjM1NzMwMzhkNTBmODZjNmNlODY3MTEyNzQ0YTQ4NjYyMGYifQ"
+    },
+    "digest": "b771eaeaf6c3957db72419dcca09440f9b61325403a6849c6536f0e54d59952f",
+    "signed_text": "z-ai/glm-5.3-flash:2528d2608fe880932539e3dc85e699dbc8a7d9bac74f4c0566de55f8516254d6:0f01f545bd6c5af9008752798c7f8d37ad0078d79067ce924a79358e06eb0ce6"
+  },
+  "anchor_tx": "BGBRESk5wEKTiuzf8NAbeUWdyZPvvJ9uYVf5nS8dfUmr",
+  "forced_tx": "31ZNmHHhgNWdNDHwQEs7xCY4F5xpBxtCiDMsHFp6M7tK",
+  "forced_refused": true,
+  "forced_reason": "over_shop_cap",
+  "forced_failure": "{\"ActionError\":{\"index\":0,\"kind\":{\"FunctionCallError\":{\"ExecutionError\":\"Smart contract panicked: over_shop_cap\"}}}}",
+  "links": {
+    "anchor": "https://testnet.nearblocks.io/txns/BGBRESk5wEKTiuzf8NAbeUWdyZPvvJ9uYVf5nS8dfUmr",
+    "forced": "https://testnet.nearblocks.io/txns/31ZNmHHhgNWdNDHwQEs7xCY4F5xpBxtCiDMsHFp6M7tK"
+  }
+}
