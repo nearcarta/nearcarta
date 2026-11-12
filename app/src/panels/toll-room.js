@@ -737,6 +737,11 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
   // F65: the newest finished crossing, its Base receipt, and the sign_cross behind it.
   async function loadDone() {
     if (typeof hooks.finished !== 'function') return;
+    // F65b: a returning visitor sees the last chain read at once; the fresh read replaces it.
+    if (!state.done && typeof hooks.finishedCached === 'function') {
+      const c = hooks.finishedCached();
+      if (c) { state.done = c; if (root.isConnected !== false) paint(); if (c.signTx) showTollProof(root, c).catch(() => {}); }
+    }
     let d = null;
     try { d = await hooks.finished(); } catch { d = null; }
     if (!d) return;

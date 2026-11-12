@@ -3,7 +3,7 @@
 // the charter answers on chain. The proof is a one-line receipt after the action.
 import * as W from './wallet.bundle.js';
 import { readSessionAccount } from './session.js';
-import { missingShopLine, unitsWords } from '/panels/toll-room.js';
+import { missingShopLine, unitsWords, TOLL_CHRONICLE_KEY } from '/panels/toll-room.js';
 import { $, sfx } from './core.js';
 import * as P from './payouts.js';
 import * as TS from './tollsplit.js';
@@ -852,6 +852,11 @@ async function nearGasWords(h, sender) {
  * F65: this row's newest finished crossing (signed on the toll), its Base tx and receipt, and
  * the sign_cross tx that asked for it. Read-only.
  */
+const LS_TOLL_LAST = owner => `nearcarta.toll.last.${owner}`;
+/** F65b: the last chain read of a paid crossing, painted at once while the chain is read again. */
+export function tollFinishedCached(owner = S.me) {
+  try { const d = JSON.parse(localStorage.getItem(LS_TOLL_LAST(owner)) || 'null'); return d && d.paid && d.order?.row_owner === owner ? d : null; } catch { return null; }
+}
 export async function tollFinished(owner = S.me) {
   if (!owner) return null;
   const list = await rowOrders(TS.TOLL_ACCT, owner);
@@ -863,7 +868,53 @@ export async function tollFinished(owner = S.me) {
   const [rc, signTx] = await Promise.all([hash ? baseReceipt(hash).catch(() => null) : null, signCrossTx(o)]);
   const gas = signTx ? await nearGasWords(signTx, owner) : '';
   const relay = hash ? paidRelay(hash, o, rc) : null;
-  return { order: o, nonce: o.tx_nonce, hash, receipt: rc, explorer: relay?.explorer || '', paid: relay?.claim === 'paid', text: relay?.text || '', signTx, gas, amount: ethWords(o) };
+  const out = { order: o, nonce: o.tx_nonce, hash, receipt: rc, explorer: relay?.explorer || '', paid: relay?.claim === 'paid', text: relay?.text || '', signTx, gas, amount: ethWords(o) };
+  if (out.paid && signTx) saveTollDone(o, { signTx, hash, block: rc?.block });
+  try { localStorage.setItem(LS_TOLL_LAST(owner), JSON.stringify(out.paid ? out : null)); } catch { /* the chain read still shows */ }
+  reconcileTollNotes(out).catch(() => {});
+  return out;
+}
+
+/**
+ * F65b: this browser's own Toll notes, checked against the chain once per hash. A note written
+ * before a fix keeps what it guessed: the stale wallet answer (a Guard cancel_hold) was kept as
+ * a Toll "set_effects", and the pass of a crossing that is now paid on Base still read "stored".
+ * Each hash is read on NEAR; the method and outcome the chain shows replace the guess.
+ */
+async function reconcileTollNotes(done) {
+  if (!S.me || typeof localStorage === 'undefined') return;
+  const key = LS_RCPT(S.charter || S.me);
+  let rows; try { rows = JSON.parse(localStorage.getItem(key) || '[]'); } catch { return; }
+  let chron; try { chron = JSON.parse(localStorage.getItem(TOLL_CHRONICLE_KEY) || '[]'); } catch { chron = []; }
+  let changed = false;
+  for (const r of rows.filter(r => r && r.shop === 'toll' && r.h).slice(0, 12)) {
+    const paidNote = done?.paid && done.signTx === r.h;
+    if (r.chk && !paidNote && !(done?.paid && r.reason === 'stored')) continue;
+    const t = await rpc('tx', { tx_hash: r.h, sender_account_id: S.me, wait_until: 'NONE' }).catch(() => null);
+    const fcall = t?.transaction?.actions?.[0]?.FunctionCall;
+    if (!t?.transaction) continue;
+    let args = {}; try { args = JSON.parse(atob(fcall?.args || '') || '{}'); } catch { args = {}; }
+    const method = fcall?.method_name || '';
+    if (method === 'cancel_hold' || method === 'confirm_hold' || method === 'guard_hold') { r.shop = 'guard'; r.reason = method; r.to = t.transaction.receiver_id; }
+    else if (method && method !== 'propose_call_as' && r.reason !== method && !/ERR_|panicked/.test(String(r.reason))) r.reason = method;
+    // The board call carries the toll's own args as a JSON string: the action id is inside.
+    let inner = args?.args; if (typeof inner === 'string') { try { inner = JSON.parse(inner); } catch { inner = {}; } }
+    const actionId = inner?.action_id ?? args?.action_id;
+    if (done?.paid && method === 'propose_call_as' && String(actionId) === String(done.order.action_id)) {
+      r.reason = 'paid'; r.paid = `${done.text} (crossing #${done.order.id})`; r.base = done.explorer;
+      const c = chron.find(c => c.h === r.h); if (c) { c.label = `pass · crossing #${done.order.id} paid on Base`; c.reason = ''; }
+    }
+    if (paidNote) { r.reason = 'sign_cross'; r.paid = done.text; r.base = done.explorer; }
+    r.chk = 1; changed = true;
+  }
+  if (done?.paid && done.signTx && !chron.some(c => c.h === done.signTx)) {
+    chron.unshift({ shop: 'toll', decision: 'allowed', reason: '', h: done.signTx, label: `sign_cross · crossing #${done.order.id} paid on Base` });
+    changed = true;
+  }
+  if (!changed) return;
+  localStorage.setItem(key, JSON.stringify(rows));
+  localStorage.setItem(TOLL_CHRONICLE_KEY, JSON.stringify(chron.slice(0, 12)));
+  noteFinal(done?.signTx || rows[0]?.h || 'reconciled', 'toll', 'allowed');
 }
 
 /**
