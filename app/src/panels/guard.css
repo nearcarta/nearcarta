@@ -179,5 +179,5 @@ body[data-shop="guard"] #room{padding-bottom:140px}
 }
 
 /* F47: an open hold's own card, above the form, with its Confirm and Cancel. */
-.guard-held{border:1px solid rgba(232,196,104,.55);border-radius:10px;padding:10px 12px;margin:0 0 10px;background:rgba(232,196,104,.08)}
+.guard-held{grid-column:1/-1;box-sizing:border-box;border:1px solid rgba(232,196,104,.55);border-radius:10px;padding:10px 12px;margin:0 0 10px;background:rgba(232,196,104,.08)}
 .guard-held .guard-status{margin:0 0 8px}
