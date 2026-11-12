@@ -43,13 +43,15 @@ test('guest: start is idempotent for the same public key', async () => {
   assert.equal(a.resumed, false);
   assert.equal(a.account, `${guestName(key)}.${PARENT}`);
   assert.deepEqual(a.txs, ['H1']);
-  assert.equal(sent, 1);
+  // F63: the welcome crate (tUSDC mint + market storage) rides on the same start, without chain reads.
+  assert.equal(sent, 3);
+  assert.deepEqual(a.crate.items.map((x) => x.item), ['tusdc', 'market_space']);
   // The same key again: the account exists with this key, so nothing is created.
   const b = await start({ public_key: key }, { ...base, keyCheck: async () => ({ exists: true, hasKey: true }) });
   assert.equal(b.ok, true);
   assert.equal(b.resumed, true);
   assert.deepEqual(b.txs, []);
-  assert.equal(sent, 1, 'the second start sent no transaction');
+  assert.equal(sent, 3, 'the second start sent no transaction');
   // A name that exists with a DIFFERENT key is a collision, not a resume.
   const c = await start({ public_key: key }, { ...base, keyCheck: async () => ({ exists: true, hasKey: false }) });
   assert.equal(c.ok, false);

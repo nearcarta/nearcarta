@@ -168,7 +168,10 @@ export async function start(body = {}, deps = {}) {
 
   const created = await createWithKey(account, pk, cfgG.fund, deps.send);
   if (created.failure) return refuse('ERR_SEND: ' + created.failure, 502, { txs: [created.tx].filter(Boolean) });
+  // F63: the welcome crate rides on the same request, so Try free is one round trip, not two.
+  const crate = deps.crate === false ? null : await welcome(account, { ...deps, cfg: cfgG, net, fresh: true }).catch(() => null);
   return {
+    crate,
     ok: true, resumed: false, account, network: 'testnet', fund: nearOf(cfgG.fund),
     txs: [created.tx].filter(Boolean), explorer: addrUrl(account),
     tx_links: [created.tx].filter(Boolean).map(txUrl),
@@ -183,7 +186,10 @@ export async function createWithKey(accountId, publicKeyRaw, fund, send) {
   // A caller that brings its own sender (a test, or an operator dry run) never reads a key.
   let r;
   if (send) r = await send(accountId, acts);
-  else r = await funder().signAndSendTransaction({ receiverId: accountId, actions: acts, waitUntil: 'FINAL', throwOnFailure: false });
+  // F63: EXECUTED_OPTIMISTIC returns once the receipt ran (about 1 s on testnet) instead of after
+  // finality (about 3 s). A failed create still shows its Failure here, and the browser's next reads
+  // and its first transaction use optimistic finality, so the new key is already usable.
+  else r = await funder().signAndSendTransaction({ receiverId: accountId, actions: acts, waitUntil: 'EXECUTED_OPTIMISTIC', throwOnFailure: false });
   return { tx: hashOf(r), failure: failureOf(r) };
 }
 // One crate per guest. The route is public, so without this a caller could ask for the same crate again
@@ -205,13 +211,14 @@ export async function welcome(accountId, deps = {}) {
   if ((deps.net || NET) !== 'testnet') return refuse('ERR_NOT_TESTNET', 404);
   const cfgG = { ...guestCfg(), ...(deps.cfg || {}) };
   if (crated.has(accountId)) return { ok: true, already: true, account: accountId, items: [] };
-  const state = await crateState(accountId, deps);
+  // A guest this request just created holds nothing yet, so the three chain reads are skipped.
+  const state = deps.fresh ? { exists: true, hasUsdc: false, hasStorage: false } : await crateState(accountId, deps);
   if (!state.exists) return refuse('ERR_NO_ACCOUNT', 404);
   if (state.hasUsdc && state.hasStorage) { crated.add(accountId); return { ok: true, already: true, account: accountId, items: [] }; }
   crated.add(accountId);
   const call = async (receiverId, acts) => (deps.send
     ? deps.send(receiverId, acts)
-    : funder().signAndSendTransaction({ receiverId, actions: acts, waitUntil: 'FINAL', throwOnFailure: false }));
+    : funder().signAndSendTransaction({ receiverId, actions: acts, waitUntil: 'EXECUTED_OPTIMISTIC', throwOnFailure: false }));
   const out = [];
   if (cfgG.tusdc && !state.hasUsdc) {
     const r = await call(cfgG.tusdc, [A.functionCall('mint', { account_id: accountId, amount: cfgG.welcomeUsdc }, 30n * 10n ** 12n, 0n)]);

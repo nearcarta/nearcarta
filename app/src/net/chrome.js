@@ -149,7 +149,8 @@ export async function startTryFree({ doc = document, onDone } = {}) {
       say(`${whyText(s.why)} You can still play the whole story in practice mode.`);
       return null;
     }
-    const crate = await welcomeCrate(s.account).catch(() => null);
+    // F63: a new guest's crate comes back with the start; only a resumed guest asks for it again.
+    const crate = s.crate || await welcomeCrate(s.account).catch(() => null);
     s.account && say('');
     showWelcomeCard({ doc, start: s, crate });
     onDone?.(s);
