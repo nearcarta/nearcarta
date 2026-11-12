@@ -280,3 +280,5 @@ body.md-play.qs-on #tray #t-src { display: none !important; }
 .md-reward .i{width:14px;height:14px}
 .md-reward small{font-weight:500;font-size:11.5px;color:var(--md-cream,#f3ead8);opacity:.8}
 @media (max-width:720px){ .md-ring{width:18px;height:18px;flex-basis:18px} .md-reward small{display:none} }
+
+.md-google { display: block; text-align: center; text-decoration: none; margin: 4px 0 2px; }

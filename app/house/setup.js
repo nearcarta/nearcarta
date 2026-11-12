@@ -154,7 +154,7 @@ async function afterPrivy() {
 }
 function wireSignin() {
   if (me) return wire();
-  const g = $('#google'); if (g) g.onclick = () => act(g, async () => { const { url } = await privy.auth.oauth.generateURL('google', location.origin + '/setup/'); sessionStorage.setItem('nc_setup_google', '1'); location.assign(url); });
+  const g = $('#google'); if (g) g.onclick = () => act(g, async () => { const { url } = await privy.auth.oauth.generateURL('google', location.origin + '/setup/'); sessionStorage.setItem('nc_setup_google', '1'); if (RETURN_TO) sessionStorage.setItem('nc_setup_next', RETURN_TO); else sessionStorage.removeItem('nc_setup_next'); location.assign(url); });
   const f = $('#emailf'); if (f) f.onsubmit = e => { e.preventDefault(); const b = f.querySelector('button:not([type])'); msg = ''; const oe = $('[data-testid=setup-err]'); if (oe) oe.remove();
     if (emailStage === 'email') act(b, async () => { email = $('#em').value.trim(); await privy.auth.email.sendCode(email); emailStage = 'code'; });
     else act(b, async () => { say('Checking your code…'); await privy.auth.email.loginWithCode(email, $('#code').value.trim());
@@ -246,7 +246,7 @@ function sFund() {
   const lead = (bal === 0n
       ? `With 0 NEAR you can still pick a character, write your rules and walk the town. To save your rules on chain and let your agent pay, add about <b>${fmtN(need())} NEAR</b>.`
       : `You can continue now. This page never moves your NEAR.`)
-    + (boardLive() ? ` <span data-testid="fund-min">To open your charter later you need at least <b>${fmtN(SIGN_MIN)} NEAR</b>: 0.02 NEAR deposit that comes back when you close it, plus up to ${fmtN(GAS_NEAR(GAS.open))} NEAR of gas the wallet holds back for a moment (unused gas is returned).</span>` : '');
+    + (boardLive() ? ` <span data-testid="fund-min">To open your charter later you need at least <b>${fmtN(SIGN_MIN)} NEAR</b>: ${fmtN(ROW_NEAR)} NEAR deposit that comes back when you close it, plus up to ${fmtN(GAS_NEAR(GAS.open))} NEAR of gas the wallet holds back for a moment (unused gas is returned).</span>` : '');
   return head('Fund', bal === 0n ? 'Your account is ready. It has 0 NEAR.' : 'Add real NEAR when you want to.', lead)
     + `<div class="addr"><figure class="qrfig"><div class="qr" role="img" aria-label="QR code: scan to send NEAR to this account">${qr}</div><figcaption>Scan to send NEAR to this account</figcaption></figure><div style="flex:1;min-width:200px">
        <label for="acct" class="small">Your NEAR account id</label><code id="acct" class="acct" data-testid="setup-address" tabindex="0">${esc(me)}</code>
@@ -401,7 +401,7 @@ function wireRules() {
         const freed = Math.max(0, used(before) - used(after));
         const need = r.receivers.reduce((n, a) => n + (!known.has(String(a)) ? 22 + String(a).length : 0), 0);
         if (freed < need + 24) {
-          msg = 'This row is full: its 0.02 NEAR of storage is all used and this shop list would not fit even after the call list is rewritten. Close the row in Your House and open a new one to change the shop list. Changing a cap or the expiry still works.';
+          msg = `This row is full: its ${fmtN(ROW_NEAR)} NEAR of storage is all used and this shop list would not fit even after the call list is rewritten. Close the row in Your House and open a new one to change the shop list. Changing a cap or the expiry still works.`;
           return render();
         }
       }
@@ -409,8 +409,8 @@ function wireRules() {
     if (boardLive() && !st.trial && !callsFitRow(callsFor(r, MAIN.board.contract), r.receivers.length)) {
       const keep = fittingShops(r.receivers, list => callsFor({ ...r, receivers: list }, MAIN.board.contract));
       msg = keep.length
-        ? `That shop list is too long for one row. A row holds 0.02 NEAR of storage, and it can hold ${keep.length} of your ${r.receivers.length} shops. Keep ${keep.join(', ')} and drop the rest.`
-        : `A row holds 0.02 NEAR of storage and this list does not fit even one shop. Use a shorter account id.`;
+        ? `That shop list is too long for one row. A row holds ${fmtN(ROW_NEAR)} NEAR of storage, and it can hold ${keep.length} of your ${r.receivers.length} shops. Keep ${keep.join(', ')} and drop the rest.`
+        : `A row holds ${fmtN(ROW_NEAR)} NEAR of storage and this list does not fit even one shop. Use a shorter account id.`;
       return render();
     }
     done(st.step); go(st.step + 1); });
@@ -890,8 +890,8 @@ async function signBoard() {
   if (!st.trial && !callsFitRow(callsFor(r, contract), r.receivers.length)) {
     const keep = fittingShops(r.receivers, list => callsFor({ ...r, receivers: list }, contract));
     throw new Error(keep.length
-      ? `That shop list is too long for one row. A row holds 0.02 NEAR of storage, and it can hold ${keep.length} of your ${r.receivers.length} shops. Keep ${keep.join(', ')} and drop the rest.`
-      : 'A row holds 0.02 NEAR of storage and this list does not fit even one shop. Use a shorter account id.');
+      ? `That shop list is too long for one row. A row holds ${fmtN(ROW_NEAR)} NEAR of storage, and it can hold ${keep.length} of your ${r.receivers.length} shops. Keep ${keep.join(', ')} and drop the rest.`
+      : `A row holds ${fmtN(ROW_NEAR)} NEAR of storage and this list does not fit even one shop. Use a shorter account id.`);
   }
   // `__NC_SETUP_WALLET` is the browser-test seam: it stands in for the NEAR Connect
   // wallet so a test can read the batch without a real approval. It never signs.
@@ -1054,7 +1054,7 @@ async function updateRules() {
     const keep = fittingShops(r.receivers, list => callsFor({ ...r, receivers: list }, contract));
     throw new Error(keep.length
       ? `That shop list is too long for one row. A row can hold ${keep.length} of your ${r.receivers.length} shops. Keep ${keep.join(', ')} and drop the rest. Update my rules would be refused on chain.`
-      : 'A row holds 0.02 NEAR of storage and this list does not fit even one shop. Update my rules would be refused on chain.');
+      : `A row holds ${fmtN(ROW_NEAR)} NEAR of storage and this list does not fit even one shop. Update my rules would be refused on chain.`);
   }
   const txs = ruleUpdateTransactions(row, r, sec, local.expiresAt);
   // One wallet approval for set_rules, set_calls, and set_agent when the key differs.
@@ -1385,8 +1385,12 @@ async function boot() {
   const q = new URLSearchParams(location.search);
   if (privy && sessionStorage.getItem('nc_setup_google') && q.get('privy_oauth_code')) {
     sessionStorage.removeItem('nc_setup_google');
-    try { await privy.auth.oauth.loginWithCode(q.get('privy_oauth_code'), q.get('privy_oauth_state'), 'google'); const back = nextPath(location.search); history.replaceState(null, '', back ? '/setup/?next=' + encodeURIComponent(back) : '/setup/'); await ensureWallet(); emailStage = 'finish'; }
+    try { await privy.auth.oauth.loginWithCode(q.get('privy_oauth_code'), q.get('privy_oauth_state'), 'google'); const back = nextPath(location.search) || nextPath('?next=' + encodeURIComponent(sessionStorage.getItem('nc_setup_next') || '')); sessionStorage.removeItem('nc_setup_next'); history.replaceState(null, '', back ? '/setup/?next=' + encodeURIComponent(back) : '/setup/'); await ensureWallet(); emailStage = 'finish'; }
     catch (e) { msg = 'Google sign-in did not finish: ' + (e?.message || e); }
+  } else if (privy && q.get('google') === '1' && RETURN_TO && !(await who())) {
+    // Market Day's "Continue with Google": go straight to Google and come back to the city.
+    try { const { url } = await privy.auth.oauth.generateURL('google', location.origin + '/setup/'); sessionStorage.setItem('nc_setup_google', '1'); sessionStorage.setItem('nc_setup_next', RETURN_TO); location.assign(url); return; }
+    catch (e) { msg = 'Google sign-in did not start: ' + (e?.message || e); }
   }
   if (!PREVIEW) {
     me = (await who()) || st.accountId || readSessionAccount() || null;
