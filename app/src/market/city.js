@@ -11,9 +11,25 @@ import * as G from '/shared/market/guide.js';
 import * as Q from '/shared/market/story.js';
 import { createStrip } from '/market/quest-strip.js';
 import * as R from '/market/live-play.js';
-// The guest's real path on testnet. Same module shape as the email-wallet one, so the city drives
-// whichever is signed in without knowing which.
-import * as GT from '/market/live-guest.js';
+
+// The guest's real path on testnet. It is ~460 KB because it carries near-api-js, and a visitor who
+// never presses a step must not download it on first load: this is a lazy proxy with the same shape as
+// live-play.js, resolved on the first call a guest actually makes. Everything before that only asks
+// `on()`, which is answered from localStorage with no network and no bundle.
+let guestMod = null;
+const guestReady = () => (guestMod ||= import('/market/live-guest.js'));
+const GT = {
+  on() {
+    try {
+      if (globalThis.NEARCARTA_NET?.net !== 'testnet') return false;
+      const v = JSON.parse(globalThis.localStorage?.getItem('nearcarta.guest.v1') || 'null');
+      return !!v?.account && v.net === 'testnet';
+    } catch { return false; }
+  },
+  GUEST_STEPS: ['cargo', 'sell', 'invest', 'seal', 'pay', 'order', 'cross', 'check', 'write'],
+  async step(id, ctx) { return (await guestReady()).step(id, ctx); },
+  async history() { return (await guestReady()).history(); },
+};
 
 const $ = (s, r = document) => r.querySelector(s);
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
