@@ -375,7 +375,7 @@ Every code hash below was read live from mainnet (`view_account`) on 2026-11-12,
 | [`toll.nearcarta.near`](https://nearblocks.io/address/toll.nearcarta.near) | `contracts/toll` | Pay-per-use gate; asks `v1.signer` for the Base signature | `DU9mVTquoKd9tbT1PqJ82exQtWsxXEjmFf623LqE1zBi` | ✅ | none |
 | [`house.nearcarta.near`](https://nearblocks.io/address/house.nearcarta.near) | `contracts/house_nft` | NEP-171 deeds with a purse, a clock and an inheritance line | `3z6dbex9mkz6BQ4fQRYcut9TPMvzKPArjbY9HKMLreHi` | ✅ | none |
 | [`guard.nearcarta.near`](https://nearblocks.io/address/guard.nearcarta.near) | `contracts/guard` | Keyless forwarder; the only account that can clear a Hall part | `9dkjuG4gA1vGWXwXKS5WyVb7opKePEC2BpCkyxb7WAaH` | ✅ | none |
-| [`townhall.nearcarta.near`](https://nearblocks.io/address/townhall.nearcarta.near) | `contracts/hall` | Job escrow, bids, counter, review digest | `6LWPMM3HzbwaySAWYH9Xu7HZCHDPjYya2cXfXHGxAtVz` | ✅ | one, for teardown |
+| [`townhall.nearcarta.near`](https://nearblocks.io/address/townhall.nearcarta.near) | `contracts/hall` | Job escrow, bids, counter, review digest | `6LWPMM3HzbwaySAWYH9Xu7HZCHDPjYya2cXfXHGxAtVz` | ✅ | 1 full-access (owner) |
 
 Also on mainnet: `relayer.nearcarta.near` (pays player gas within caps), nine `keeper-*.nearcarta.near` sub-accounts, and the root `nearcarta.near`.
 
