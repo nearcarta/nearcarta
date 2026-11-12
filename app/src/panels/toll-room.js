@@ -535,6 +535,20 @@ function txLinks(txs) {
   return bits.join(' ');
 }
 
+/** F65: fill "What the chain saw" with the sign_cross of a finished crossing. Browser only. */
+async function showTollProof(root, d) {
+  const doc = root?.ownerDocument || globalThis.document;
+  if (!doc) return;
+  const m = await import(new URL('../shop-proof.js', import.meta.url).href);
+  const owner = String(d.order.row_owner || '');
+  m.showProof({
+    contract: 'toll.nearcarta.near', method: 'sign_cross',
+    signer: owner.length > 20 ? `${owner.slice(0, 6)}…${owner.slice(-4)}` : owner,
+    gas: d.gas || '', amount: `${d.amount} to ${String(d.order.to).slice(0, 6)}…${String(d.order.to).slice(-4)} on Base`,
+    decision: 'allowed', tx: d.signTx, net: 'mainnet',
+  }, { doc });
+}
+
 export function tollMarkup(state = {}) {
   const tab = state.tab || 'pass';
   const on = name => tab === name ? ' on' : '';
@@ -563,6 +577,12 @@ export function tollMarkup(state = {}) {
       <p class="ferry-rate">${oo.status === 'signing' ? 'Signed on NEAR. Finish crossing waits for the MPC signature and sends it to Base.' : 'Finish crossing: your wallet signs it once, the MPC signs the Base transaction, and it is sent to Base. No new fee.'}</p>
       <button type="button" class="ferry-cta" id="toll-finish" data-testid="toll-finish"${state.pending ? ' disabled' : ''}>${state.pending ? esc(state.pending) : 'Finish crossing'}</button></div>`
     : '';
+  // F65: the newest finished crossing, once Base has a success receipt for it.
+  const dn = state.done && state.done.paid && !oo ? state.done : null;
+  const paidCard = dn
+    ? `<div class="toll-open toll-paid" data-testid="toll-paid" role="status"><p class="ferry-rate"><b data-testid="toll-paid-line">${esc(dn.text)}</b></p>
+      <p class="ferry-rate">Crossing #${esc(dn.order.id)} to <span title="${esc(dn.order.to)}">${esc(String(dn.order.to).slice(0, 6))}…${esc(String(dn.order.to).slice(-4))}</span>. <a class="rc tx" data-testid="toll-paid-tx" href="${esc(dn.explorer)}" target="_blank" rel="noopener">basescan ↗</a></p></div>`
+    : '';
   const baseTx = state.baseTx ? `<p class="toll-pass-tx"><a class="rc tx" data-testid="toll-base-tx" href="${esc(state.baseTx)}" target="_blank" rel="noopener">Base transaction ↗</a></p>` : '';
   const status = state.seal || '';
   // A visitor with no board row cannot pass: the board has nothing to spend.
@@ -580,6 +600,12 @@ export function tollMarkup(state = {}) {
   const sig = state.sig ? `<p id="toll-sig-out" data-testid="check-signature-out">${esc(state.sig)}</p>` : '<p id="toll-sig-out" data-testid="check-signature-out"></p>';
   const recent = (live.recent || []).map(r => {
     const link = r.explorer ? ` <a class="rc tx" data-testid="toll-foreign-tx" href="${esc(r.explorer)}" target="_blank" rel="noopener">basescan</a>` : '';
+    // F65: this row's own crossing is named by its order id, and paid once Base says so.
+    const d = state.done;
+    if (d && d.hash && String(r.nonce) === String(d.nonce) && (!r.tx_hash || r.tx_hash === d.hash)) {
+      const words = d.paid ? `paid. ${d.text}.` : `${esc(r.status || '')}. ${d.text || r.words || ''}`;
+      return `<li data-testid="toll-live-row" data-mine="1"><b>#${esc(d.order.id)}</b> ${esc(words)}${link}</li>`;
+    }
     return `<li data-testid="toll-live-row"><b>#${esc(r.nonce)}</b> ${esc(r.status || '')}. ${esc(r.words || '')}${link}</li>`;
   }).join('');
   const canBroadcast = (live.recent || []).some(r => r.can_broadcast);
@@ -591,7 +617,7 @@ export function tollMarkup(state = {}) {
       <button type="button" class="ferry-tab toll-tab${on('split')}" role="tab" id="toll-tab-split" data-testid="toll-tab-split" data-tab="split" aria-selected="${sel('split')}">Ledger</button>
     </div>
     <div class="ferry-pane toll-pane" data-testid="toll-pane-pass"${tab === 'pass' ? '' : ' hidden'}>
-      ${openCard}
+      ${openCard}${paidCard}
       <div class="ferry-flow tok-done" data-testid="toll-flow">${near}<span class="ferry-flow-arrow">→</span>${chainIcon}</div>
       <div class="toll-pair">
         <label class="field ferry-field"><span>Chain</span>
@@ -706,6 +732,16 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
     try { list = await hooks.orders(); } catch { list = null; }
     if (!Array.isArray(list)) return;
     state.openOrder = list.filter(o => o.status === 'open' || o.status === 'signing').pop() || null;
+  }
+
+  // F65: the newest finished crossing, its Base receipt, and the sign_cross behind it.
+  async function loadDone() {
+    if (typeof hooks.finished !== 'function') return;
+    let d = null;
+    try { d = await hooks.finished(); } catch { d = null; }
+    if (!d) return;
+    state.done = d;
+    if (d.signTx) showTollProof(root, d).catch(() => {});
   }
 
   const paint = () => {
@@ -863,6 +899,7 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
       state.seal = res?.hint || '';
       if (res?.baseTx) state.baseTx = res.baseTx;
       await loadOrders().catch(() => {});
+      await loadDone().catch(() => {});
       if (root.isConnected !== false) paint();
     };
     const tabs = root.querySelector('.ferry-tabs');
@@ -941,6 +978,7 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
   // is known. A visitor with no row has no address and sees the setup line instead.
   loadWallet().then(() => { if (root.isConnected !== false) paint(); }).catch(() => {});
   loadOrders().then(() => { if (root.isConnected !== false) paint(); }).catch(() => {});
+  loadDone().then(() => { if (root.isConnected !== false) paint(); }).catch(() => {});
 }
 
 if (typeof window !== 'undefined') prefetchTollPolicy();
