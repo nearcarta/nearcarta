@@ -210,18 +210,26 @@ export const PAIRS = [['USDC@base', '30'], ['ETH@base', '0.01'], ['USDC@near', '
 export const SAMPLE = { zec: 'u1naczqa5m5nefpyqnhs8h3dw8un8z8us45xwgfh4ees95mayyru9snc33dkfk2dc27r5syu4uveyyd5dt8wwad89kpc3f8cah055lm0ex',
   near: '561e8ef0fecb621469da30250dc6cdcd1e47a66e561e8ef0fecb621469da3025', evm: '0x561E8eF0FEcB621469dA30250dC6CdCD1E47A66e' };
 let routesMemo = null;
-export async function routes({ ttlMs = 30 * 60e3 } = {}) {
-  if (routesMemo && Date.now() - routesMemo.at < ttlMs) return routesMemo.v;
-  const out = [];
-  for (const p of PAIRS) {
+let routesBusy = null;
+// F63: the route checks run side by side (they took ~5 s one after another), and a memo past its TTL is
+// still answered at once while a fresh check runs behind it, so opening the Ferry never waits on 1Click.
+async function checkRoutes() {
+  const out = await Promise.all(PAIRS.map(async (p) => {
     const origin = p.from.split('@')[1];
     try {
       const v = await quote({ from: tokenRef(p.from), to: tokenRef(p.to), amount: p.amount, privacy: 'public',
         recipient: p.to === 'ZEC@zec' ? SAMPLE.zec : SAMPLE.near, refundTo: origin === 'near' ? SAMPLE.near : SAMPLE.evm });
-      out.push({ ...p, ok: !!v.ok, error: v.ok ? null : v.error || 'checks failed' });
-    } catch (e) { out.push({ ...p, ok: false, error: e.message }); }
-  }
+      return { ...p, ok: !!v.ok, error: v.ok ? null : v.error || 'checks failed' };
+    } catch (e) { return { ...p, ok: false, error: e.message }; }
+  }));
   const v = { at: new Date().toISOString(), routes: out };
   if (out.some(r => r.ok)) routesMemo = { at: Date.now(), v };
   return v;
+}
+export async function routes({ ttlMs = 30 * 60e3, staleMs = 6 * 3600e3 } = {}) {
+  const age = routesMemo ? Date.now() - routesMemo.at : Infinity;
+  if (age < ttlMs) return routesMemo.v;
+  const run = routesBusy || (routesBusy = checkRoutes().finally(() => { routesBusy = null; }));
+  if (age < staleMs) { run.catch(() => null); return routesMemo.v; }
+  return run;
 }
