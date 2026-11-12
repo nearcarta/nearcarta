@@ -10,7 +10,7 @@ const API = 'https://nearcarta-api.onrender.com';
 const API_TESTNET = 'https://nearcarta-api-testnet.onrender.com';
 
 function toApi(req, u, secret, base = API, strip = '') {
-  const path = strip ? u.pathname.replace(strip, '') : u.pathname;
+  const path = strip ? u.pathname.replace(strip, '/api') : u.pathname;
   const h = new Headers({ 'x-middleware-rewrite': base + path + u.search });
   const keys = [];
   for (const [k, v] of req.headers) if (k !== 'x-nearcarta-proxy') { h.set('x-middleware-request-' + k, v); keys.push(k); }
@@ -27,7 +27,7 @@ export default async function middleware(req) {
     const secret = process.env.NC_PROXY_SECRET;
     return secret ? toApi(req, new URL(req.url), secret) : pass();
   }
-  // /tapi/* is the testnet API. The rewrite strips the /t prefix so the service sees /api/*.
+  // /tapi/* is the testnet API. The proxy maps /tapi/x to /api/x on the testnet service.
   if (path.startsWith('/tapi/')) {
     const secret = process.env.NC_PROXY_SECRET;
     return secret ? toApi(req, new URL(req.url), secret, API_TESTNET, '/tapi') : pass();
