@@ -14,7 +14,7 @@ A 64-hex implicit account can't hold sub-accounts, so the funds move once into a
 
 The agent keys have a **finite** allowance (`AGENT_ALLOWANCE`, default 0.25). When it runs out, the owner rotates the key with `set_agent_key`; r18 adds the new key and deletes the old one in one batch.
 
-Arena, house deed and Town Hall are covered in `docs/MAINNET_CONSOLIDATION.md`.
+Arena, house deed and Town Hall are recorded in `shared/deployments/mainnet.json`.
 
 ### Step 0: create the named root
 
@@ -143,7 +143,7 @@ Mainnet runs protocol 86. Builds with near-sdk 5.28 or newer import host functio
    - allowlisted pay, MPC-signed (signed only, not broadcast on Base): `4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz`; non-allowlisted refused: `B9FFjcSA9djgn2cWotwZJdag2bHJDSJGNLMLtML6BWtR`
    - full-access key deleted: `6C1rLPtYKpxQgX5ZYFYSyGsbQEify9AVQ23fdXKAskxY`
    - final: 253,139 bytes, code hash `9RQw6e1PL81HSQ1x6dr6dyvv9yAMMBdqChRToyHuDwDP`.
-5. Arena, house deed and Town Hall: see Part C in `docs/MAINNET_CONSOLIDATION.md`.
+5. Arena, house deed and Town Hall: see `shared/deployments/mainnet.json`.
 
 ## Reproducible builds
 

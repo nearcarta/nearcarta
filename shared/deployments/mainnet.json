@@ -20,7 +20,7 @@
     "crate": "contracts/charter_board",
     "wasm": "contracts/artifacts/charter_board.wasm",
     "max_row_yocto": "40000000000000000000000",
-    "note": "B1–B5 build (docs/AUDIT.md) live 2026-11-10 Africa/Cairo: reaped and created again under the same name. Loosening calls need 1 yocto.",
+    "note": "B1–B5 build live 2026-11-10 Africa/Cairo: reaped and created again under the same name. Loosening calls need 1 yocto.",
     "code_hash": "51kKGvtV23SsZL4JCjD1135yqarHAGnBQ7DybLU4GDGX",
     "wasm_sha256": "3b9fb966a545f7183cc071ff263c5dac286224cee2bd7174c439be9ddd06d45c",
     "build": "nep330",

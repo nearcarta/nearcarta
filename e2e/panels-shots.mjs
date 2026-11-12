@@ -1,7 +1,7 @@
 // Live read-only pass: open each shop's side panel at 390 and 1440 and screenshot it. Signs nothing.
 // TAG=before|after OUT=dir node e2e/panels-shots.mjs
 import { chromium } from 'playwright';
-const BASE = process.env.BASE || 'https://nearcarta.vercel.app', TAG = process.env.TAG || 'after', OUT = process.env.OUT || '/workspace/near/judges_review/panels_after';
+const BASE = process.env.BASE || 'https://nearcarta.vercel.app', TAG = process.env.TAG || 'after', OUT = process.env.OUT || 'shots/panels_after';
 const SHOPS = ['guard', 'ferry', 'hall', 'bank', 'arena', 'toll', 'chronicle', 'house', 'payouts'];
 const b = await chromium.launch(), out = {};
 for (const [W, H] of [[390, 844], [1440, 900]]) {

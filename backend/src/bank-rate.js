@@ -1,5 +1,5 @@
 // NEAR price for a cap proposal only. The statement amounts stay in their own currency.
-// Source: CoinGecko simple price, the same public feed cited in docs/MAINNET_COST_PLAN.md.
+// Source: CoinGecko simple price, a public price feed.
 const CACHE_MS = 10 * 60 * 1000;
 const cache = new Map();
 

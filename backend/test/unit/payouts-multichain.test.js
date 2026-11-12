@@ -2,7 +2,7 @@
 // A foreign row is a real 1Click EXACT_OUTPUT swap paid by the visitor's own session, gated by the
 // visitor's own board row. A zero-NEAR issuer is registered from the same session cap, bounded by the
 // USDC contract's own storage_balance_bounds.min. Nothing here signs; the sandbox and mainnet proofs
-// are run by the owner (see docs/PAYOUTS_LIVE.md).
+// are run by the owner.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
