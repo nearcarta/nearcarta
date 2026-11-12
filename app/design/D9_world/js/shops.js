@@ -31,7 +31,11 @@ export function preload(){ return core8().then(()=>APP&&ui8()).catch(()=>null); 
 export async function load(id, bust){
   try{ const C8=L.C8=await core8(); const mod=await import(D8+'shops/'+id+'.js'+(bust?`?r=${bust}`:'')); const tk={}; const live=()=>L.sh&&L.sh.tk===tk;
     const sh=await mod.default({ setResult:(...a)=>live()&&!APP&&setResult(...a), setHero:(...a)=>live()&&setHero(...a), live }); sh.id=id; sh.tk=tk; dress(sh.scene); return {sh}; }
-  catch(err){ console.error(`[Nearcarta] shop "${id}" failed to load:`,err); return {err}; } }
+  catch(err){ console.error(`[Nearcarta] shop "${id}" failed to load:`,err);
+    // F62 (film 2026-11-12): one failed module fetch on a busy page showed "This room could not
+    // load" until Try again. Retry once, fresh, before saying so.
+    if(!bust) return load(id, Date.now());
+    return {err}; } }
 // back the room with the town's evening: sky gradient, the sea under the island, and a fog that melts the sea into the horizon
 function dress(scene){ const k=skyCols(); const c=document.createElement('canvas'); c.width=4; c.height=256; const x=c.getContext('2d'); const g=x.createLinearGradient(0,0,0,256);
   g.addColorStop(0,'#'+k.top.getHexString()); g.addColorStop(.55,'#'+k.mid.getHexString()); g.addColorStop(1,'#'+k.hor.getHexString()); x.fillStyle=g; x.fillRect(0,0,4,256);
