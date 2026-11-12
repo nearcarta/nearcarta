@@ -2202,3 +2202,9 @@ body #shopUI #tray #t-form .hall-pane,
 body #shopUI #tray #t-form .hall-card { padding-bottom: 0 !important; }
 body #shopUI #tray #t-form .hall-pane > .hall-status:last-child { margin-bottom: 0 !important; }
 body #shopUI #tray > .t-row { margin-top: var(--p4) !important; }
+
+/* F48 (film 2026-11-12): in a shop the menu sat at z 21, under the room's #fade (z 30, which
+   takes pointer events while it is on). On a slow frame the fade lingers after the room opens,
+   and every press on All shops landed on the fade. Above it once the entry is done; still below
+   #shopMenu (35) and every modal. */
+body.in-shop:not(.entering) nav.all-shops { z-index: 31; }
