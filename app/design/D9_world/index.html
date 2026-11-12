@@ -203,6 +203,8 @@ import('/shared/net/net.js').then((m) => {
       'keeper-toll': dep.keepers?.pattern ? dep.keepers.pattern.replace('<shop>', 'toll') : `keeper-toll.${dep.root}`,
       lookalike: dep.guest?.row?.lookalike || '',
       tollTo: dep.toll?.foreign_address || '',
+      // A record that carries its own shop map (the testnet one does) has the last word.
+      ...Object.fromEntries(Object.entries(dep.shops || {}).filter(([k, v]) => k !== 'note' && typeof v === 'string' && v)),
     }, dep.guest?.row || null);
   }).catch(() => { /* the published fallbacks stay */ });
 }).catch(() => { /* the town still opens without the guest path */ });

@@ -110,12 +110,12 @@ export async function mintDeed({ doc = document } = {}) {
   if (!s) { if (note) note.textContent = 'No test account in this browser yet.'; return null; }
   const house = cfg.shops.house || (NET === 'testnet' ? 'house.nearcarta.testnet' : 'house.nearcarta.near');
   if (note) note.textContent = 'Signing…';
-  const r = await s.call(house, 'mint_deed', {}, { deposit: 3n * 10n ** 22n, gas: 60n * 10n ** 12n });
+  const r = await s.call(house, 'mint_deed', {}, { deposit: 3n * 10n ** 22n, gas: 60n * 10n ** 12n }).catch((e) => ({ hash: null, failure: String(e?.message || e) }));
   const ok = !r.failure && r.hash;
   if (note) {
     note.innerHTML = ok
       ? `Your deed is minted on testnet. <a href="${txUrl(r.hash)}" target="_blank" rel="noopener">View ↗</a>`
-      : 'The deed was not minted this time. The rest of the city still works.';
+      : `The deed was not minted this time (${esc(String(r.failure || 'no receipt').replace(/^.*panicked: /, '').slice(0, 80))}). The rest of the city still works.`;
   }
   return r;
 }

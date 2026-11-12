@@ -260,7 +260,9 @@ export function makeApp() {
     for (const n of IP_HEADERS) if (raw.get(n)) seen[n] = n === 'x-vercel-ip-country' ? 'set' : `${raw.get(n).split(',').length} hop(s)`;
     return c.json({ client_ip_from: from, client_tag: ipTag(ip), shared_cap: egress ? 'egress:' + ipTag(egress) : null, proxy_verified: proxyVerified(c), ip_headers: seen, header_names: [...raw.keys()].filter(n => !IP_HEADERS.includes(n)).sort() });
   });
-  app.get('/api/deployments', limiter(30), c => c.json(MAINNET_DEP || { status: 'not_deployed' }));
+  // The record of the network this service runs on: the guest page reads its shop names from it, so the
+// testnet service must not hand out mainnet accounts.
+app.get('/api/deployments', limiter(30), c => c.json((NET === 'testnet' ? DEP : MAINNET_DEP) || { status: 'not_deployed' }));
   // The deployments record is a file, not a chain read: cached at the edge and in this process,
   // so the tray's per-account ask does not cost a route call each time.
   app.get('/api/mainnet', limiter(120), edgeCache(60), c => c.json(deploymentsBody()));
