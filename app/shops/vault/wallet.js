@@ -11,8 +11,17 @@ export function makeConnector() {
   return { connector, GUEST_ID: '' };
 }
 
-export async function currentAccount(connector) {
-  try { const { accounts } = await connector.getConnectedWallet(); return accounts?.[0]?.accountId || null; } catch { return null; }
+// F26 (film 2026-11-12): a visitor signed in with Google/Privy on /setup has no NEAR Connect wallet in
+// this tab, and getConnectedWallet() could stay pending, so the shops never read the session account or
+// the row. A wallet that has not answered in time is "no wallet": the saved session account is used.
+export const WALLET_ANSWER_MS = 2500;
+export async function currentAccount(connector, ms = WALLET_ANSWER_MS) {
+  let timer;
+  const late = new Promise((resolve) => { timer = setTimeout(() => resolve(null), ms); });
+  try {
+    const got = await Promise.race([connector.getConnectedWallet().then((w) => w?.accounts?.[0]?.accountId || null, () => null), late]);
+    return got || null;
+  } catch { return null; } finally { clearTimeout(timer); }
 }
 
 export function txHashOf(res) {

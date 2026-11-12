@@ -248,7 +248,10 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
     if (plan.action === 'check' && fields.payee && fields.amount) loadAttested(fields);
     else if (plan.action === 'check') { state.attested = null; }
     const result = await runGuardAction(plan, ctx());
-    state.notice = result?.hint || '';
+    // F27 (film 2026-11-12): a pay sets state.notice from the live send (the tx, the hold, or the
+    // reason it did not go). This line used to overwrite it with the offline book's hint ("Allow
+    // matches… Pay through guard sends it"), so a press looked like nothing happened.
+    if (!(plan.action === 'pay' && result?.live)) state.notice = result?.hint || '';
     scene(result);
     paint();
     return result;

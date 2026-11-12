@@ -629,7 +629,7 @@ function deriveLine(state) {
     return `<p class="ferry-rate" data-testid="toll-derive">Could not derive the address in this browser: ${esc(d.error)}</p>`;
   }
   return `<p class="ferry-rate" data-testid="toll-derive">${d.ok
-    ? `Derived ${esc(d.computed)} from the toll public key. The toll signs with it and does not pay your account from it.`
+    ? `The toll's own address (not yours): derived ${esc(d.computed)} from the toll public key. The toll signs with it and does not pay your account from it. Your row gets its own address with its first crossing.`
     : `The derived address ${esc(d.computed || '?')} does not match the recorded ${esc(d.recorded)}. Do not trust either until they agree.`}</p>`;
 }
 
@@ -720,7 +720,9 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
     clearSeal();
     const quote = policyQuote(state.live?.ok ? state.live : { ok: false });
     const plan = parseTollCommand(typeof text === 'string' ? text : '', quote);
-    if (!plan.ok) return plan;
+    // F26 (film 2026-11-12): a press with a blank Amount or Destination returned here without a word,
+    // so 'Pay on Base' looked dead. The reason is painted on the Pay tab now.
+    if (!plan.ok) { state.seal = plan.hint || TOLL_HINT; state.tab = 'pass'; paint(); return plan; }
     if (plan.action === 'check') {
       const sig = await checkSignature();
       return { ok: true, action: 'check', hint: sig };
@@ -783,7 +785,9 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
       state.amount = amount;
       state.asset = asset;
       if (chain === 'arbitrum') { runAgent('cross to Arbitrum'); return; }
-      const line = amount && to ? `pay ${amount} ${asset} to ${to} on Base` : (to ? `pay the toll on Base to ${to}` : 'Pay the toll');
+      // The asset select always has a value, so it is always in the line; a missing amount or address
+      // gets its own sentence from parseTollCommand.
+      const line = `pay ${amount ? amount + ' ' : ''}${asset}${to ? ' to ' + to : ''} on Base`;
       runAgent(line);
     };
     if (pay) pay.onclick = () => {
