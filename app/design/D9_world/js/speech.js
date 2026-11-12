@@ -7,6 +7,9 @@ const layer=()=>document.getElementById('bubbles');
 const live=[]; const tv=new THREE.Vector3();
 export let blip=()=>{}; export function setBlip(f){ blip=f; }
 const words=s=>s.trim().split(/\s+/).length;
+export const READ_S=1.4;
+/** The text a bubble shows: the typewriter prefix, or the whole line once it is ending (hushed, replaced, timed out). */
+export function shownText(text,n,ending){ return ending?text:text.slice(0,n); }
 export function say(who,text,{style='say',tone='',dur=null,name=null}={}){
   if(words(text)>12) console.warn('bubble over 10 words:',text);
   // one bubble per speaker
@@ -15,7 +18,8 @@ export function say(who,text,{style='say',tone='',dur=null,name=null}={}){
   const nm=name??who.name; if(nm){ const w=document.createElement('span'); w.className='who'; w.textContent=nm; el.appendChild(w); }
   const tx=document.createElement('span'); tx.className='tx'; el.appendChild(tx); layer().appendChild(el);
   const speed=style==='think'?24:30; // chars / s
-  const b={who,el,tx,text,t0:clock.T,shown:0,speed,end:clock.T+(dur??Math.max(2.2,text.length/speed+1.6)),x:null,y:null,w:0,h:0,style};
+  // A line always stays up until it is fully typed plus a moment to read it, whatever `dur` asked for.
+  const b={who,el,tx,text,t0:clock.T,shown:0,speed,end:clock.T+Math.max(dur??0,text.length/speed+READ_S,2.2),x:null,y:null,w:0,h:0,style};
   if(RM){ tx.textContent=text; b.shown=text.length; }
   if(who&&style!=='think') who.talkUntil=clock.T+Math.min(text.length/speed+.3,3.2);
   live.push(b); return b;
@@ -45,13 +49,16 @@ export function update(){
   const vis=[];
   for(const b of live){
     // typewriter: reveal by sim time, blip every other letter, pitch per speaker
+    // A hushed or replaced line used to fade out mid-word ('Fro', 'You co'). Ending lines show in full.
+    if(T>=b.end&&b.shown<b.text.length){ b.shown=b.text.length; b.tx.textContent=shownText(b.text,b.shown,true); }
     const n=Math.min(b.text.length,Math.floor((T-b.t0)*b.speed)); if(n>b.shown){ for(let k=b.shown;k<n;k++){ const ch=b.text[k]; if(k%2===0 && /[a-z0-9]/i.test(ch)) blip(b.who.voice||1,b.style,ch); } b.shown=n; b.tx.textContent=b.text.slice(0,n); }
     const p=b.who.top(); tv.copy(p); tv.y+=.12; const dist=cam.position.distanceTo(tv); tv.project(cam);
     const on=tv.z<1 && Math.abs(tv.x)<1.15 && Math.abs(tv.y)<1.15;
     const fade=1-Math.min(1,Math.max(0,(dist-28)/18)); const life=T>b.end?0:Math.min(1,(T-b.t0)*6);
     b.op=on?fade*life:0;
     if(b.op<.02){ b.el.style.opacity='0'; b.x=null; continue; }
-    if(!b.w){ const cur=b.tx.textContent; b.tx.textContent=b.text; b.w=Math.min(b.el.offsetWidth+1||160,w-24); b.h=b.el.offsetHeight||40; b.el.style.width=b.w+'px'; b.el.style.minHeight=b.h+'px'; b.tx.textContent=cur; b.h=Math.max(b.h,b.el.offsetHeight); }
+    if(!b.w&&b.el.offsetWidth>0){ const cur=b.tx.textContent; b.tx.textContent=b.text; b.w=Math.min(b.el.offsetWidth+2,w-24); b.h=b.el.offsetHeight||40; b.el.style.width=b.w+'px'; b.el.style.minHeight=b.h+'px'; b.tx.textContent=cur; b.h=Math.max(b.h,b.el.offsetHeight); }
+    if(!b.w){ b.el.style.opacity='0'; continue; }
     b.ax=(tv.x*.5+.5)*w; b.ay=(-tv.y*.5+.5)*h; vis.push(b);
     b.sc=.86+.14*fade;
   }

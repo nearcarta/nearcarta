@@ -11,6 +11,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { P, CAPTURE, clock, rnd, hx, key, DIRS, hdist, edgePt, tiles, isTown, bTile, SHOPS, EXTRA, GATE, road, doorOf, pickRoad, SQ3 } from './core.js';
 
 export const LP = P.has('lp') || P.get('mode')==='lp';
+export const GATE_CAP_NEAR = 6;
 export const W = { scene:null, camera:null, renderer:null, composer:null, B:{}, pickables:[], lamps:[], houses:[], roadSets:[], U:null, gatePos:null, jetty:{}, boat:null, tod:1, frz:0, hit:0 };
 const $ = s=>document.querySelector(s);
 
@@ -572,7 +573,9 @@ export function update(dt){ const T=clock.T; U.time.value=T;
   // ward
   updZec(dt);
   W.hit=Math.max(0,W.hit-dt*.5); U.hit.value=W.hit; W.refuse=Math.max(0,(W.refuse||0)-dt*.3); U.refuse.value=Math.min(1,W.refuse); U.glow.value=.55+W.frz*.4;
-  W.gateCaps.forEach(c=>c.material.color.set(W.hit>.08||W.refuse>.15?0xff6b6b:W.frz>.5?0xa8d8ff:0x00ec97));
+  W.gateCaps.forEach(c=>{ c.material.color.set(W.hit>.08||W.refuse>.15?0xff6b6b:W.frz>.5?0xa8d8ff:0x00ec97);
+    // Close to the gate the glowing cap filled the frame as a big green diamond: hide it near the lens.
+    c.visible=!W.camera||W.camera.position.distanceTo(c.position)>GATE_CAP_NEAR; });
   // boat
   const b=W.boat, bu=b.userData; const goal=[W.jetty.home,W.jetty.mid,W.jetty.far][bu.goal]; tmp.copy(goal).sub(b.position); const dl=tmp.length(); b.position.addScaledVector(tmp,Math.min(1,dt*.55)*(1-W.frz)); b.position.y=-.06+Math.sin(T*2)*.025*(1-W.frz); b.rotation.z=Math.sin(T*1.5)*.04*(1-W.frz);
   bu.sail.scale.x=1+Math.sin(T*1.7)*.05*(1-W.frz)+Math.min(dl,1)*.12; bu.lan.material.color.copy(LAMPC.warm).lerp(LAMPC.ice,W.frz); bu.lan.material.opacity=.4+K.lamp*.6;
