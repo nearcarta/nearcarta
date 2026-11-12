@@ -233,6 +233,15 @@ export function proofWords(rec, { baseReceipt } = {}) {
   return { claim: 'none', text: `Status ${status || 'unknown'}. This is not a Base payment.` };
 }
 
+/** Base units to a short decimal ("100000000000000", 18 -> "0.0001"). */
+export function unitsWords(units, decimals = 18) {
+  try {
+    const v = BigInt(units || 0), d = 10n ** BigInt(decimals);
+    const f = (v % d).toString().padStart(decimals, '0').replace(/0+$/, '');
+    return f ? `${v / d}.${f}` : String(v / d);
+  } catch { return String(units || ''); }
+}
+
 export function walletWords({ owner = '', address = null } = {}) {
   const path = rowPath(owner, 'base');
   if (!path) return { path: '', address: '', text: 'Sign in to see your spend limit. Nothing was signed.' };
@@ -542,6 +551,19 @@ export function tollMarkup(state = {}) {
     : (quote.payable
       ? `Fee ${quote.feeNear} NEAR. Your spend limit caps the amount.`
       : 'The live policy has no visitor fee.');
+  // F61c: a crossing this row already paid for (open or signing on the toll) gets its own card,
+  // first on the Pay tab, with the one button that finishes it. The fee line says the fee is
+  // paid, and the usual Pay button steps aside so nothing reads like a second charge.
+  const oo = state.openOrder || null;
+  const ooAmt = oo ? unitsWords(oo.amount, oo.asset === 'usdc' ? 6 : 18) : '';
+  const ooSym = oo && oo.asset === 'usdc' ? 'USDC' : 'ETH';
+  const ooTo = oo ? `${String(oo.to).slice(0, 6)}…${String(oo.to).slice(-4)}` : '';
+  const openCard = oo
+    ? `<div class="toll-open" data-testid="toll-open-order" role="status"><p class="ferry-rate"><b>Crossing #${esc(oo.id)} · ${esc(ooAmt)} ${ooSym} to <span title="${esc(oo.to)}">${esc(ooTo)}</span> · fee already paid</b></p>
+      <p class="ferry-rate">${oo.status === 'signing' ? 'Signed on NEAR. Finish crossing waits for the MPC signature and sends it to Base.' : 'Finish crossing: your wallet signs it once, the MPC signs the Base transaction, and it is sent to Base. No new fee.'}</p>
+      <button type="button" class="ferry-cta" id="toll-finish" data-testid="toll-finish"${state.pending ? ' disabled' : ''}>${state.pending ? esc(state.pending) : 'Finish crossing'}</button></div>`
+    : '';
+  const baseTx = state.baseTx ? `<p class="toll-pass-tx"><a class="rc tx" data-testid="toll-base-tx" href="${esc(state.baseTx)}" target="_blank" rel="noopener">Base transaction ↗</a></p>` : '';
   const status = state.seal || '';
   // A visitor with no board row cannot pass: the board has nothing to spend.
   // That is a setup step, not an error, so it gets its own line and link.
@@ -569,6 +591,7 @@ export function tollMarkup(state = {}) {
       <button type="button" class="ferry-tab toll-tab${on('split')}" role="tab" id="toll-tab-split" data-testid="toll-tab-split" data-tab="split" aria-selected="${sel('split')}">Ledger</button>
     </div>
     <div class="ferry-pane toll-pane" data-testid="toll-pane-pass"${tab === 'pass' ? '' : ' hidden'}>
+      ${openCard}
       <div class="ferry-flow tok-done" data-testid="toll-flow">${near}<span class="ferry-flow-arrow">→</span>${chainIcon}</div>
       <div class="toll-pair">
         <label class="field ferry-field"><span>Chain</span>
@@ -590,11 +613,12 @@ export function tollMarkup(state = {}) {
       <label class="field ferry-field"><span>Destination</span>
         <input id="toll-to" data-testid="toll-to" autocomplete="off" spellcheck="false" placeholder="0x and 40 hex" value="${esc(state.to || '')}" aria-label="Destination">
       </label>
-      <p class="ferry-rate tok-done" data-testid="toll-foreign">${esc(feeLine)}</p>
+      <p class="ferry-rate tok-done" data-testid="toll-foreign">${esc(oo ? `Fee already paid for crossing #${oo.id}. Finishing it charges nothing.` : feeLine)}</p>
       <p class="ferry-charter-note tok-done" data-testid="toll-refuse"${status ? '' : ' hidden'}>${esc(status)}</p>
       ${rowNote}
       ${passTx ? `<p class="toll-pass-tx">${passTx}</p>` : ''}
-      <button type="button" class="ferry-cta" id="toll-pay" data-testid="toll-pay"${ctaBlocked ? ' disabled' : ''}>${esc(ctaText)}</button>
+      ${baseTx}
+      ${oo ? '' : `<button type="button" class="ferry-cta" id="toll-pay" data-testid="toll-pay"${ctaBlocked ? ' disabled' : ''}>${esc(ctaText)}</button>`}
     </div>
     <div class="ferry-pane toll-pane" data-testid="toll-pane-proof"${tab === 'proof' ? '' : ' hidden'}>
       <div class="ferry-flow tok-done">${chainIcon}<p class="toll-address" data-testid="toll-address">${esc(wallet.address || 'No address yet')}</p></div>
@@ -661,6 +685,27 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
     state.balanceWords = got?.address
       ? (got?.balance_eth ? `Balance ${got.balance_eth} ETH on Base.` : 'Balance not read yet.')
       : 'No address yet. The signer returns one with this row\'s first crossing.';
+    // F61c: derive the address from the MPC key and the path now, without a first crossing.
+    if (typeof hooks.rowAddress === 'function') {
+      try {
+        const d = await hooks.rowAddress();
+        if (d?.address) {
+          if (!state.rowAddress) state.rowAddress = d.address;
+          state.rowDerived = true;
+          state.balanceWords = d.balanceWei != null
+            ? `Balance ${unitsWords(d.balanceWei, 18)} ETH on Base. Derived from the MPC key for ${d.path}.`
+            : `Derived from the MPC key for ${d.path}. Balance not read.`;
+        }
+      } catch { /* the toll's own record above still stands */ }
+    }
+  }
+  // F61c: this row's crossings on the toll. The newest open or signing one is shown as paid.
+  async function loadOrders() {
+    if (typeof hooks.orders !== 'function') return;
+    let list = null;
+    try { list = await hooks.orders(); } catch { list = null; }
+    if (!Array.isArray(list)) return;
+    state.openOrder = list.filter(o => o.status === 'open' || o.status === 'signing').pop() || null;
   }
 
   const paint = () => {
@@ -762,6 +807,7 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
     if (res?.refused) hooks.showRefuse?.(state.seal);
     else hooks.hideRefuse?.();
     if (res?.success && (res.o?.tx || res.tx)) state.passTx = res.o?.tx || res.tx;
+    if (res?.baseTx) state.baseTx = res.baseTx;
     state.tab = 'pass';
     paint();
     return res || { ok: false, hint: 'The pass did not run.' };
@@ -800,6 +846,16 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
         if (e.key === 'Enter') { e.preventDefault(); sendPay(); }
       });
     });
+    const finish = root.querySelector('#toll-finish');
+    if (finish) finish.onclick = () => {
+      const o = state.openOrder;
+      if (!o) return;
+      state.to = o.to;
+      state.amount = unitsWords(o.amount, o.asset === 'usdc' ? 6 : 18);
+      state.asset = o.asset === 'usdc' ? 'USDC' : 'ETH';
+      Promise.resolve(runAgent(`pay ${state.amount} ${state.asset} to ${state.to} on Base`))
+        .finally(() => loadOrders().then(() => { if (root.isConnected !== false) paint(); }));
+    };
     const tabs = root.querySelector('.ferry-tabs');
     if (tabs) tabs.addEventListener('keydown', (e) => {
       if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
@@ -875,6 +931,7 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
   // The Wallet tab names this visitor's own derived address, so read it once the row
   // is known. A visitor with no row has no address and sees the setup line instead.
   loadWallet().then(() => { if (root.isConnected !== false) paint(); }).catch(() => {});
+  loadOrders().then(() => { if (root.isConnected !== false) paint(); }).catch(() => {});
 }
 
 if (typeof window !== 'undefined') prefetchTollPolicy();
