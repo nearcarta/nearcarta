@@ -162,7 +162,22 @@ export function rulesDiff(local, row) {
   if (!sameReceivers(local.receivers, row.receivers)) out.push({ id: 'receivers', label: 'Allowed shops', onChain: showReceivers(row.receivers), next: showReceivers(local.receivers) });
   const exp = expiryChange(row.expires_at, local.expiresAt);
   if (exp) out.push(exp);
+  // Compared only when the page says what it will write (local.minAmount, yocto). A row opened
+  // before /setup wrote 1 yocto has 0.0001 NEAR here, and the board then refuses the 1 yocto a
+  // wrap.near ft_transfer attaches, so the Ferry swap can never finish on it.
+  if (local.minAmount != null && String(local.minAmount) !== String(row.min_amount ?? '')) {
+    out.push({ id: 'min', label: 'Smallest payment', onChain: showMin(row.min_amount), next: showMin(local.minAmount) });
+  }
   return out;
+}
+
+/** The smallest payment in words: under 0.000001 NEAR it reads in yocto, which is what it is. */
+export function showMin(yocto) {
+  try {
+    const y = BigInt(String(yocto ?? ''));
+    if (y < 10n ** 18n) return `${y} yocto`;
+  } catch { return String(yocto ?? ''); }
+  return showNear(yocto);
 }
 
 /** Deposit sentence for the update button. Amounts come from the contract deposits, not a guess. */
