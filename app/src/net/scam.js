@@ -121,6 +121,9 @@ export function scamMarkup() {
 export function installScamErrand({ doc = document } = {}) {
   const host = doc.getElementById('scam-errand');
   if (!host) return null;
+  // F42 (film 2026-11-12): on mainnet the card only said "this errand runs on the test network"
+  // over the town, with every control disabled. It is a testnet errand, so mainnet shows nothing.
+  if (!onTestnet()) { host.hidden = true; host.innerHTML = ''; const h = doc.querySelector('[data-testid="scam-errand-host"]'); if (h) h.hidden = true; return null; }
   host.innerHTML = scamMarkup();
   const note = host.querySelector('[data-testid="scam-note"]');
   const reply = host.querySelector('[data-testid="scam-reply"]');

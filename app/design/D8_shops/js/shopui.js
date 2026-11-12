@@ -1019,6 +1019,8 @@ const APPS = {
         sendPay: (p) => A.guardPay(p),
         sendConfirm: (p) => A.guardConfirm(p),
         sendCancel: (p) => A.guardCancel(p),
+        // F38: the board's own list of open holds, so a hold made before a reload still shows Confirm.
+        holds: () => (typeof A.boardHoldIds === 'function' ? A.boardHoldIds() : Promise.resolve(null)),
         row: () => !!(A.S.board && A.S.boardRow),
         frozen: () => !!A.S.state?.frozen,
         // Same board-row blind spot as Arena: read the live row first.
@@ -1305,6 +1307,13 @@ const badge = d => { const [c, t] = BADGE[d] || ['pend', String(d || '?').replac
 function card({ d, amt = '', to = '', why = '', link = '', title = 'Latest result' }) {
   return `<section class="dz"><h3>${title}</h3><article class="card ${(BADGE[d] || ['pend'])[0]}" data-testid="latest"><div class="ch">${badge(d)}${amt ? `<b class="amt">${esc(amt)}</b>` : ''}</div>`
     + (to ? `<p class="to">to <b title="${esc(to)}">${esc(nice(to) || short(to, 10, 7))}</b></p>` : '') + (why ? `<p class="why">${why}</p>` : '') + (link ? `<div class="lk">${link}</div>` : '') + '</article></section>';
+}
+// F46 (film 2026-11-12): a new transaction did not reach "Latest result" until the shop was
+// repainted, so the side panel showed an older tx. Every send announces itself (`nearcarta:tx`,
+// from apps.js noteFinal), so the panel is redrawn then and the newest tx is its linked top card.
+if (!globalThis.__dzTx && typeof addEventListener === 'function') {
+  globalThis.__dzTx = true;
+  addEventListener('nearcarta:tx', () => setTimeout(() => { try { if (cur) proofDrawer(); } catch { /* the tray still works */ } }, 80));
 }
 // copy buttons and the panel's own action button (it presses the tray's main button)
 if (!globalThis.__dzBound && globalThis.document) { globalThis.__dzBound = true;
