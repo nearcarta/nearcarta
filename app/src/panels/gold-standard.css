@@ -1491,3 +1491,16 @@ body.ferry-tray #shopUI #tray > .t-row.ferry-secondary-row:not(:has(#t-act:not([
     min-height: 28px !important;
   }
 }
+
+/* F37/F40/F41 (film 2026-11-12, 1920x1200 and 1280x800): the tray is a fixed 748px frame with
+   `overflow: hidden`, and section 6 above made its column `overflow: visible`. A shop taller than
+   the frame was cut: Toll's Pay on Base sat below the edge, Town Hall's Post job was clipped with a
+   "more below" that scrolled nothing, the overflow drew over the link row and took its clicks, and
+   the flex column shrank "What the chain saw" so the tab bar landed on its text. The Bank had the
+   same fault and its fix (F35) is applied to every shop here: nothing in the column shrinks below
+   its content, and the column scrolls inside the frame. Ferry keeps its own layout. */
+@media (min-width: 721px) {
+  html body:not(.ferry-tray) #shopUI #tray > .t-scroll { overflow-y: auto !important; overflow-x: hidden !important; min-height: 0 !important; flex-shrink: 1 !important; }
+  html body:not(.ferry-tray) #shopUI #tray > .t-scroll > * { flex-shrink: 0 !important; }
+  html body:not(.ferry-tray) #shopUI #tray .proof-slot { flex: 0 0 auto !important; }
+}
