@@ -1019,6 +1019,8 @@ const APPS = {
         sendPay: (p) => A.guardPay(p),
         sendConfirm: (p) => A.guardConfirm(p),
         sendCancel: (p) => A.guardCancel(p),
+        // F38: the board's own list of open holds, so a hold made before a reload still shows Confirm.
+        holds: () => (typeof A.boardHoldIds === 'function' ? A.boardHoldIds() : Promise.resolve(null)),
         row: () => !!(A.S.board && A.S.boardRow),
         frozen: () => !!A.S.state?.frozen,
         // Same board-row blind spot as Arena: read the live row first.
