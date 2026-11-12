@@ -75,7 +75,8 @@ test('the agent key is a second approval, after the row opens', () => {
   const fn = src.slice(src.indexOf('async function signBoard()'), src.indexOf('function noteSign'));
   // The board transaction goes first and alone.
   const boardSend = fn.indexOf('signAndSendTransactions({ transactions: [built.open] })');
-  const rowProof = fn.indexOf("get_charter', { owner: me }", boardSend);
+  // The read-back is pollRow (get_charter until the row is there, F23), called after the send.
+  const rowProof = fn.indexOf('await pollRow(readRpc, contract)', boardSend);
   const keyCall = fn.indexOf('await sendKey()');
   assert.ok(boardSend > 0, 'the board transaction is sent');
   assert.ok(rowProof > boardSend, 'the row is read back after the board transaction');

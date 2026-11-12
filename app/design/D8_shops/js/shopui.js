@@ -1144,6 +1144,8 @@ const APPS = {
       // Chronicle already proved rather than a second implementation.
       onAnchor: async ({ body, digest }) => {
         const out = await A.anchorStatement({ kind: 'invoice', digest, salt: 'nearcarta2026' });
+        // F30: the drawer lists this shop's receipts, so the anchor goes in as a Payouts receipt.
+        if (out?.ok && out.tx) { A.rememberReceipt(out.tx, 'payouts', 'allowed', 'anchor', { amt: '', to: A.S.board || '' }); if (cur === 'payouts') proofDrawer(); }
         return out?.ok ? { ok: true, tx: out.tx, body } : { ok: false, hint: `The board refused the anchor: ${out?.reason || 'refused'}. Nothing was signed.` };
       },
       onForeignPay: (row, opts) => A.payoutsForeign(row, opts),

@@ -289,3 +289,14 @@ body.bank-tray #shopUI #t-form button.bank-copy{
   }
   #bank-agent-dock .bank-agent-avatar{width:56px;height:56px}
 }
+/* F33: the attestation file shown in the Log pane */
+.bank-attest{margin:6px 0;color:#e6d3b0;font:600 12px/1.35 system-ui,sans-serif}
+.bank-attest-json{max-height:220px;overflow:auto;margin:4px 0;padding:6px 8px;background:rgba(0,0,0,.35);border-radius:6px;font:500 11px/1.4 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+/* F35 (1920x1200 film take): in the fixed 748px tray the flex column shrank "What the chain saw"
+   to 116px while its rows needed 179px, so the rows drew over the next paragraph. Nothing in the
+   Bank column may shrink below its content; the column scrolls instead. */
+@media (min-width: 721px) {
+  body.bank-tray #shopUI #tray > .t-scroll { overflow-y: auto !important; overflow-x: hidden !important; }
+  body.bank-tray #shopUI #tray > .t-scroll > * { flex-shrink: 0 !important; }
+  body.bank-tray #shopUI #tray .proof-slot { flex: 0 0 auto !important; }
+}

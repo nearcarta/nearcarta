@@ -55,8 +55,9 @@ const coinsAt = (y, d) => { const m = 10n ** BigInt(d); const t = (BigInt(y) * m
 /** "1.2000 → 1.1964": the fewest decimals (1 to 6) that show the two prices differ. */
 export function priceMove(before, after) {
   const b = BigInt(before), a = BigInt(after);
+  if (a === b) return { text: `${coins(b)} → ${coins(a)}`, down: false, same: true };
   let d = 1; while (d < 6 && coinsAt(b, d) === coinsAt(a, d)) d++;
-  return { text: `${coinsAt(b, d)} → ${coinsAt(a, d)}`, down: a < b, same: a === b };
+  return { text: `${coinsAt(b, d)} → ${coinsAt(a, d)}`, down: a < b, same: false };
 }
 const near = (y) => { const s = yoctoToNear(String(y)); const [a, b = ''] = s.split('.'); return b ? `${a}.${b.slice(0, 4).padEnd(4, '0')}` : `${a}.0000`; };
 

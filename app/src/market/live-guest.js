@@ -355,6 +355,13 @@ export async function scamForce({ signer } = {}) {
   const limit = (cfg.scamLimit || {}).amount_near || '0.5';
   const yocto = BigInt(Math.round(Number(limit) * 1e6)) * 10n ** 18n;
   const payee = cfg.shops['keeper-guard'] || 'keeper-guard.nearcarta.testnet';
+  // The force goes through the guest's own board row. A visitor who opens the errand before any Market
+  // Day step has no row yet, and the board answered ERR_NO_CHARTER ("Nothing was sent", prod 2026-11-12).
+  // Open it first, once; openRow is a no-op when the row exists.
+  const row = await openRow({ signer: s }).catch((e) => ({ hash: null, failure: String(e?.message || e) }));
+  if (row?.failure || row?.refused) {
+    return record('force', `The row for this check could not be opened: ${reasonOf(row.failure || row.refused)} (testnet)`, { hash: row.hash || null, failure: row.failure || row.refused, refused: false, reason: reasonOf(row.failure || row.refused), amount_near: limit, url: row.hash ? txUrl(row.hash) : null });
+  }
   // The exact intent the keeper refused, signed by the row's own key so the signature is valid: the
   // only thing that can stop it is the row's cap.
   const r = await callAs(s, {

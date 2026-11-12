@@ -42,11 +42,14 @@ test('F17: the invest top-up sells the good the Arena pays most for', () => {
 test('F18: the price line shows enough decimals to see the move', async () => {
   const src = city.slice(city.indexOf('const coinsAt'), city.indexOf('\n}', city.indexOf('export function priceMove')) + 2);
   const COIN = 10n ** 20n;
-  const { priceMove } = new Function('Q', src.replace('export function', 'function') + '; return { priceMove };')({ COIN });
+  const coins = (y) => { const t = (BigInt(y) * 10n) / COIN; const w = t / 10n, f = t % 10n; return f ? `${w}.${f}` : `${w}`; };
+  const { priceMove } = new Function('Q', 'coins', src.replace('export function', 'function') + '; return { priceMove };')({ COIN }, coins);
   const m = priceMove(120n * 10n ** 18n, 11964n * 10n ** 16n);
   assert.equal(m.text, '1.200 → 1.196');
   assert.equal(m.down, true);
   assert.equal(priceMove(COIN, COIN).same, true);
+  // An unchanged price prints plainly, not as 1.320000 → 1.320000.
+  assert.equal(priceMove(132n * 10n ** 18n, 132n * 10n ** 18n).text, '1.3 → 1.3');
   assert.match(city, /pm\.down \? 'Your sale pushed the price down/);
 });
 
@@ -61,4 +64,10 @@ test('F19-F22: /judge header is solid, the column is wide and centred, no unfini
   assert.match(g, /Open the refusal<\/a><span class="why-failed"/);
   assert.ok(g.includes(FAILED_NOTE));
   assert.match(FAILED_NOTE, /Failed on purpose/);
+});
+
+test('the scam errand opens the guest row before forcing the over-limit payment', () => {
+  const g = read('app/src/market/live-guest.js');
+  const f = g.slice(g.indexOf('export async function scamForce'), g.indexOf('async function sealProfit'));
+  assert.ok(f.indexOf('openRow({ signer: s })') > 0 && f.indexOf('openRow({ signer: s })') < f.indexOf('callAs(s,'));
 });

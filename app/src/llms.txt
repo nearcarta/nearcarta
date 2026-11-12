@@ -5,7 +5,9 @@ https://github.com/nearcarta/nearcarta#readme
 
 A town of shops. The Lamplighter proposes a payment. The charter contract allows it or refuses it on NEAR mainnet.
 
-The visitor charter is one row on board.nearcarta.near. The code hash is 6aBm6TugZzge9uHDpSsr6pG7XPfZm22JoZ8XZxknRGsa. Deploy: https://nearblocks.io/txns/CaZr8GmMM83WUEESUShTiKtth8PWgxtRTesYGs1mkdpt
+The visitor charter is one row on board.nearcarta.near. The live code hash is 51kKGvtV23SsZL4JCjD1135yqarHAGnBQ7DybLU4GDGX (read from chain with view_account on 2026-11-12). Deploy: https://nearblocks.io/txns/5Zp4i6nySszG8c41Up79ENFQjSsPRHrLMkc5dLREKdrV
+
+The three links below were made on an earlier build of the same contract (code hash 6aBm6TugZzge9uHDpSsr6pG7XPfZm22JoZ8XZxknRGsa, deploy https://nearblocks.io/txns/CaZr8GmMM83WUEESUShTiKtth8PWgxtRTesYGs1mkdpt).
 
 An allowed payment of 0.001 NEAR: https://nearblocks.io/txns/8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR
 A refusal over the per-payment cap: https://nearblocks.io/txns/CcPMX1DtMJ8UyCm4toUHossrFTrHhVKXrSe6L69s9ceF
