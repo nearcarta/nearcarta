@@ -73,7 +73,7 @@ const view = (method, args) => account.provider.callFunction({ contractId: board
 // defaults, then the shop methods the row may call, each with the per-action cap.
 const G = JSON.parse(readFileSync(new URL('../shared/deployments/testnet.json', import.meta.url), 'utf8')).guest?.row || {};
 const charter = await view('get_charter', { owner: accountId }).catch(() => null);
-if (!charter?.rules) {
+if (!charter?.owner && !charter?.rules) {
   const receivers = G.receivers || [];
   const cap = String(G.per_action_cap || '5000000000000000000000');
   const opened = await send(board, [A.functionCall('open_charter', {

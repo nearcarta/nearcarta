@@ -95,6 +95,7 @@ export function scamProofFacts(run) {
 export function scamMarkup() {
   const off = onTestnet() ? '' : ' disabled';
   return `<section class="scam" data-testid="scam-errand" aria-label="Try to talk a keeper past its limit">
+    <button type="button" class="scam-close" data-testid="scam-close" aria-label="Close the errand">×</button>
     <h2>Try to talk a keeper past its limit</h2>
     <p class="scam-intro">${onTestnet()
       ? 'Type anything at the keeper, including an instruction to ignore its rules. A refusal here is not a sentence on a screen: it is signed inside a TEE and then written to the chain, and you can force the over-limit payment and watch the charter refuse it.'
@@ -124,6 +125,7 @@ export function installScamErrand({ doc = document } = {}) {
   const forceBtn = host.querySelector('[data-testid="scam-force"]');
   const input = host.querySelector('[data-testid="scam-text"]');
   let last = null;
+  host.querySelector('[data-testid="scam-close"]')?.addEventListener('click', () => host.classList.add('closed'));
 
   host.querySelectorAll('[data-example]').forEach((b) => b.addEventListener('click', () => {
     input.value = EXAMPLES[Number(b.dataset.example)];

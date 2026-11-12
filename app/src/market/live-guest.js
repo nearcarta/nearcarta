@@ -134,7 +134,8 @@ export async function openRow({ signer } = {}) {
   if (!s) return null;
   const board = cfg.shops.board || 'board.nearcarta.testnet';
   const existing = await s.view(board, 'get_charter', { owner: s.accountId }).catch(() => null);
-  if (existing?.rules) return { already: true, hash: null };
+  // get_charter answers the row itself (owner, receivers, caps), or null when there is none.
+  if (existing?.owner || existing?.rules) return { already: true, hash: null };
   const g = cfg.guestRow || {};
   const receivers = (g.receivers || []).filter(Boolean);
   if (!receivers.length) return { refused: 'ERR_NO_RECEIVERS', hash: null };
