@@ -242,8 +242,8 @@ function stripHtml(id) {
     if (done === 'seal' && r.real?.hash) sub = `Check passed · the amount stays hidden<br>The Bank sealed it for you: <a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Receipt ↗</a> · ${esc(r.real.burnt_near)} NEAR gas, paid by the Bank<br>Your reveal key stays in this browser`;
     else if (done === 'seal') sub = `Check passed · the amount stays hidden<br>On chain the Bank logs only a fingerprint: <a class="qs-proof" href="${pr0.url}" target="_blank" rel="noopener">Bank anchor ↗</a> · ${pr0.cost} NEAR gas, paid by the Bank<br><span class="qs-chip">Your seal: practice, no spend</span>`;
     if (done === 'pay') sub = `Paid to: your porter · 3 coins from your purse · invoice #${Q.state(city).day} kept<br><span class="qs-chip">Practice, no spend</span>`;
-    if (GT.on() && r.real && (done === 'cross' || done === 'check' || done === 'pay')) {
-      const what = { cross: 'Toll: the fee paid from your row', check: '✓ Square keeper: paid<br>✗ Look-alike: refused, not on your list', pay: 'Porter paid 3 test dollars, under your cap' }[done];
+    if (GT.on() && r.real && (done === 'cross' || done === 'check' || done === 'pay' || done === 'seal')) {
+      const what = { cross: 'Toll: the fee paid from your row', check: '✓ Square keeper: paid<br>✗ Look-alike: refused, not on your list', pay: 'Porter paid 3 test dollars, under your cap', seal: 'Check passed · the amount stays hidden<br>Your own row anchored only a fingerprint; the reveal key stays in this browser' }[done];
       sub = `${what}<br>${guestReceipt(r)}`;
     }
     if (done === 'write') { const today = Q.state(city).log.map((e) => `${NAME[e.shop]}: ${esc(Q.STEP[e.id].done)}`); sub = `Level ${r.level} · your purse keeps ${coins(p.near)} coins<br>Today, ${today.length} entries:<br>${today.join('<br>')}<br>${receiptLine(lastDone.step, r)}`; }
