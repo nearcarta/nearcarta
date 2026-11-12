@@ -148,7 +148,9 @@ export function installScamErrand({ doc = document } = {}) {
     row.className = `scam-row ${s.state}`;
     row.setAttribute('data-testid', `scam-row-${s.id}`);
     row.innerHTML = `<b aria-hidden="true">${word}</b> <span>${esc(s.label)}</span>${s.url ? ` <a href="${esc(s.url)}" target="_blank" rel="noopener">open ↗</a>` : ''}${s.note ? ` <small>${esc(s.note)}</small>` : ''}`;
-    receipts.append(row);
+    // F59: a step's result replaces its "…" line, so "Asking the keeper…" does not stay above its ✓.
+    const prev = receipts.querySelector(`[data-testid="scam-row-${s.id}"]`);
+    if (prev) prev.replaceWith(row); else receipts.append(row);
   };
 
   askBtn.addEventListener('click', async () => {

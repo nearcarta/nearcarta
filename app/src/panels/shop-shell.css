@@ -706,3 +706,12 @@ body #shopUI #tray #t-title .i3 { filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .3
   body #shopUI #tray > .t-scroll > .t-label { display: none !important; }
   body #shopUI #tray .hero { font-size: 26px; margin: var(--sp-1) var(--sp-3); }
 }
+/* F60: the guest's "Play for real" is an outlined secondary, not the shop's gold action. */
+body #shopUI #tray > .t-row > #t-act.ghost:not([hidden]) {
+  background: rgba(0, 0, 0, .24) !important;
+  background-image: none !important;
+  color: var(--gs-cream, #f3e6cc) !important;
+  border: 1px solid var(--gs-line-gold, rgba(247, 213, 126, .45)) !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+}

@@ -29,6 +29,8 @@ const GT = {
   GUEST_STEPS: ['cargo', 'sell', 'invest', 'seal', 'pay', 'order', 'cross', 'check', 'write'],
   async step(id, ctx) { return (await guestReady()).step(id, ctx); },
   async history() { return (await guestReady()).history(); },
+  async coins() { return (await guestReady()).coins(); },
+  async saltQuote() { return (await guestReady()).saltQuote(); },
   /** This guest's own testnet moves, read from localStorage (no bundle). Older guests' rows are left out. */
   txs() {
     try {
@@ -127,13 +129,15 @@ const WHY = {
   ERR_TILL: 'The till cannot pay that much.', ERR_PLAYER_DAILY_CAP: 'Daily limit reached: you can earn more tomorrow.',
   ERR_CITY_DAILY_CAP: 'The city has paid its daily limit. Back tomorrow.', ERR_OWN_ORDER: 'That is your own order.', ERR_SMALL: 'Invest at least 10 coins.',
 };
-const fail = (e) => toast(WHY[e.code] || e.message, 'no');
+const fail = (e) => toast(WHY[e.code] || (failureCode(e.code || e.message) ? failureText(e.code || e.message) : e.message), 'no');
 
 // The reward a finished day pays, said in words: what you keep and what the day proved. Practice, the
 // demo purse and a guest all end here; only the receipt line under it differs.
 const REWARD_LINE = () => {
   const st = Q.state(city);
   const coinsEarned = BigInt(Q.STEPS.length) * BigInt(Q.COIN);
+  // F53: a real purse (guest or live) says what it really holds, not the practice reward.
+  if (livePurse()) return `your purse holds ${coins(realPurse)} coins${GT.on() ? ' · every step is a testnet receipt' : ''}`;
   return `you keep ${coins(coinsEarned)} coins${st.toll ? ` after ${coins(st.toll)} toll` : ''}${GT.on() ? ' · every step is a testnet receipt' : ''}`;
 };
 
@@ -142,8 +146,18 @@ const PH = { dawn: 'dawn', market: 'sun', dusk: 'dusk', night: 'night' };
 let lastPhase = null;
 // Signed in: the purse is the real one, read from the market.
 let realPurse = null;
-const purse = () => (Q.state(city).sealed ? '••••' : coins(R.on() && realPurse != null ? realPurse : me().near));
-async function readPurse() { if (!R.on()) return; const v = await R.coins(); if (v != null) { realPurse = v; hud(); } }
+// F54: the sealed profit is private on chain (only "check passed" is public), but the player still
+// sees their own number; the seal icon and the tooltip say why. F53: a guest's HUD reads the real purse.
+const livePurse = () => (R.on() || GT.on()) && realPurse != null;
+const purse = () => coins(livePurse() ? realPurse : me().near);
+let liveQuote = null;
+async function readPurse() {
+  if (!R.on() && !GT.on()) return;
+  const v = await (R.on() ? R.coins() : GT.coins()).catch(() => null);
+  if (GT.on()) liveQuote = await GT.saltQuote().catch(() => null);
+  if (v != null) realPurse = v;
+  hud(); if (GT.on() && !busy) paintStrip();
+}
 function hud() {
   const c = S.cityClock(city.t), p = me(), pr = Q.progress(city);
   K('phase').innerHTML = ICON[PH[c.phase]];
@@ -163,6 +177,7 @@ function hud() {
   if (nd) { nd.hidden = pr.done === 0; nd.classList.toggle('gold', pr.done >= pr.total); }
   K('near').textContent = purse();
   K('pi').innerHTML = Q.state(city).sealed ? ICON.seal : ICON.coin;
+  K('pi').parentElement?.setAttribute('title', Q.state(city).sealed ? 'Sealed: on chain only “check passed” is public. This number is shown only to you.' : 'Your purse');
   const n = Object.entries(p.bag).filter(([g]) => !g.startsWith('share:')).reduce((a, [, v]) => a + v, 0);
   K('bagn').textContent = n || ''; K('bagn').hidden = !n;
   if (c.phase !== lastPhase) { lastPhase = c.phase; sky(c.phase); if (c.phase === 'dawn') dawnOrders(); }
@@ -196,8 +211,8 @@ async function go() {
   const s = Q.current(city); walking = true; close(); quest();
   try {
     WD().guideSay?.(`To the ${NAME[s.shop]}.`, { dur: 1.8 });
-    await WD().walkTo?.(s.shop); WD().guideWave?.();
-    if (Q.firstVisit(city, s.shop)) { save(); if (!WD().keeperSay?.(s.shop, s.intro, { dur: 2.6 })) WD().guideSay?.(s.intro, { dur: 2.6 }); await new Promise((r) => setTimeout(r, 2000)); }
+    await WD().walkTo?.(s.shop, { fast: true, max: 4 }); WD().guideWave?.();
+    if (Q.firstVisit(city, s.shop)) { save(); if (!WD().keeperSay?.(s.shop, s.intro, { dur: 2.6 })) WD().guideSay?.(s.intro, { dur: 2.6 }); await new Promise((r) => setTimeout(r, 1200)); }
     WD().quest?.clear();
     await WD().enterShop?.(s.shop);
   } finally { walking = false; quest(); }
@@ -222,6 +237,16 @@ const testnetPill = '<span class="qs-net-pill" data-testid="testnet-pill">TESTNE
 const costLine = (s) => (GT.on() && GT.GUEST_STEPS.includes(s.id)
   ? `${testnetPill} Real testnet move · free`
   : (!R.on() && R.DEMO_STEPS.includes(s.id) ? 'Real move, played with the city’s demo purse · the city pays the gas' : R.on() && REAL_STEP[s.id] ? `${REAL_STEP[s.id]} · no gas, the city pays it` : '<span class="qs-chip">Practice, no spend</span>'));
+// F51: a refusal is said as one short sentence, never raw chain JSON. The code is kept, small, for support.
+const FAIL_TEXT = {
+  ERR_FLOAT: 'The toll is short of float on testnet, so the signature was not asked for. Nothing left your purse.',
+  ERR_PRECHECK_STORAGE: 'Your market space was still being topped up. Press again.',
+  ERR_STORAGE: 'Your market space was still being topped up. Press again.',
+  over_shop_cap: 'Over your cap: your rules refused it.',
+  ERR_NONCE: 'Two moves crossed. Press again.',
+};
+export const failureCode = (f) => { const t = String(f || ''); return (/panicked: ([A-Za-z_][\w]*)/.exec(t) || /\b(ERR_[A-Z_]+)\b/.exec(t) || /\b(over_[a-z_]+)\b/.exec(t) || [])[1] || ''; };
+export const failureText = (f) => { const c = failureCode(f); return FAIL_TEXT[c] || (c ? `The chain refused this step (${c}). Nothing was spent.` : 'The chain refused this step. Nothing was spent.'); };
 // One pill a judge cannot miss, plus the receipt link, on every real guest step.
 const guestReceipt = (r) => {
   const pill = testnetPill;
@@ -232,12 +257,11 @@ const guestReceipt = (r) => {
     // No Base Sepolia ETH: the MPC signature is real, the foreign transaction is not sent.
     const signed = r.real.raw_signed ? ` Signed transaction: <code>${esc(String(r.real.raw_signed).slice(0, 22))}…</code>` : '';
     const evm = r.real.evm_hash ? ` Base Sepolia hash <code>${esc(String(r.real.evm_hash).slice(0, 14))}…</code> (never broadcast, so no explorer page).` : '';
-    if (r.real.failure && !r.real.evm_hash) return `${pill} The MPC signature did not come back this time: ${esc(String(r.real.failure).slice(0, 90))}${r.real.hash ? ` · <a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Receipt ↗</a>` : ''}`;
+    if (r.real.failure && !r.real.evm_hash) return `${pill} No MPC signature this time. ${esc(failureText(r.real.failure))}${r.real.hash ? ` · <a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Receipt ↗</a>` : ''}`;
     return `${pill} Signed by NEAR's MPC network on testnet, not sent to Base Sepolia.${signed}${evm}${r.real.hash ? ` <a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Signature ↗</a>` : ''}`;
   }
   if (r.real?.failure) {
-    const why = (/panicked: ([^"\\]+)/.exec(String(r.real.failure)) || [])[1] || String(r.real.failure).slice(0, 90);
-    return `${pill} The testnet transaction was refused: ${esc(why)}${r.real.hash ? ` · <a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Receipt ↗</a>` : ''}`;
+    return `${pill} ${esc(failureText(r.real.failure))}${r.real.hash ? ` · <a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Receipt ↗</a>` : ''}`;
   }
   if (r.real?.hash) return `${pill} <a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Receipt ↗</a> · a real testnet transaction`;
   return `${pill} No transaction this time. Practice mode still works.`;
@@ -274,7 +298,7 @@ function stripHtml(id) {
   }
   if (s && s.shop === id) {
     let reward = esc(s.reward), extra = '';
-    if (s.id === 'sell') { const pv = Q.salePreview(city); const c2 = structuredClone(city); let t = 0n; try { t = S.sell(c2, Q.ME, 'arena', 'good:salt', pv.n); } catch {} reward = `+${coins(t)} coins · ${coins(pv.before)} each`; extra = `<div class="qs-more">${whyBlock('good:salt')}</div>`; }
+    if (s.id === 'sell') { const pv = Q.salePreview(city); const c2 = structuredClone(city); let t = 0n; try { t = S.sell(c2, Q.ME, 'arena', 'good:salt', pv.n); } catch {} reward = GT.on() ? (liveQuote != null ? `about +${coins(liveQuote * 3n)} coins · ${coins(liveQuote)} each at the Arena now` : 'Coins at the Arena’s live price') : `+${coins(t)} coins · ${coins(pv.before)} each`; extra = `<div class="qs-more">${whyBlock('good:salt')}</div>`; }
     return { gold: true, html: row(num(pr.done + 1), s.need, `${reward}<br>${costLine(s)}`, gold('act', s.btn)) + extra };
   }
   // off the story path: the Square is still the market and producing shops still make goods
@@ -285,7 +309,9 @@ function stripHtml(id) {
   if (s) return { gold: false, html: row(`<span class="qs-n dim">${pr.done + 1}</span>`, `Next stop: ${NAME[s.shop]}`, esc(s.need), ghost('there', 'Go')) };
   return null;
 }
+let leaving = false;
 function paintStrip() {
+  if (leaving) return;
   if (!playing || !inShop) { strip.hide(); return; }
   const v = stripHtml(inShop); if (!v) { strip.hide(); return; }
   if (flash && flash.shop === inShop) v.html = v.html.replace(/<small>[\s\S]*?<\/small>/, `<small class="qs-flash${flash.no ? ' no' : ''}">${esc(flash.text)}</small>`);
@@ -306,9 +332,11 @@ async function stripClick(a, b) {
     else if (a === 'stall') { if (busy) return; busy = true; flash = { shop: inShop, text: 'One moment…' }; paintStrip(); try { const id = await R.freeStall(); if (id == null) throw Object.assign(new Error('Every stall is held this week.'), { code: 'ERR_PRECHECK_STALL_TAKEN' }); await R.rentStall(id); R.live.stall = id; flash = { shop: inShop, text: `Stall ${id} is yours for a week` }; readPurse(); } finally { busy = false; } }
     else if (a === 'sell') { const t = S.sell(city, Q.ME, 'arena', b.dataset.good, +b.dataset.n); flash = { shop: inShop, text: `Sold for ${coins(t)} coins` }; save(); hud(); }
     else if (a === 'collect') { let got = 0, good = null; for (const [n, g] of S.nodesAt(inShop)) { try { got += S.gather(city, Q.ME, n); good = g; } catch {} } if (got) flash = { shop: inShop, text: `+${got} ${GOOD(good).toLowerCase()} in your bag` }; save(); hud(); }
-    else if (a === 'next' || a === 'there') { lastDone = null; strip.hide(); await WD().exitShop?.(); if (Q.current(city)) setTimeout(go, 350); return; }
+    // F56: the strip stays up while the shop closes. Hiding it first showed the shop's own empty form
+    // (the Jobs Shop's Post job) for the second the exit takes.
+    else if (a === 'next' || a === 'there') { leaving = true; try { await WD().exitShop?.(); } finally { leaving = false; lastDone = null; strip.hide(); } if (Q.current(city)) setTimeout(go, 350); return; }
     paintStrip();
-  } catch (e) { flash = { shop: inShop, text: WHY[e.code] || e.message, no: true }; paintStrip(); }
+  } catch (e) { flash = { shop: inShop, text: WHY[e.code] || (failureCode(e.code || e.message) ? failureText(e.code || e.message) : e.message), no: true }; paintStrip(); }
 }
 addEventListener('world:interior-ready', (e) => { inShop = e.detail?.id || null; flash = null; if (lastDone && lastDone.shop !== inShop) lastDone = null; whyOpen = false; setTimeout(paintStrip, 30); });
 // what a keeper did while you were inside, said in the street as you step out: the world shows them buying, selling, refusing

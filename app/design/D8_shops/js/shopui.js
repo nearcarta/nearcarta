@@ -1473,6 +1473,9 @@ function paint() {
     if (app.guest && app.form) { form(app.form()); app.bind?.(); } else form('');
     const id = who();
     if (ferryQuoted) { btn(null); document.body.classList.add('ferry-tray'); }
+    // F60 (film 2026-11-12): a testnet guest already has an identity, so the gold "Sign in" read as a
+    // dead end. A guest sees an outlined "Play for real" (the same sign-in) instead.
+    else if (!id && testnetGuest()) btn('Play for real', 'ghost');
     else if (!A.S.ready) btn(id ? 'Opening…' : 'Sign in', 'primary', !!id);
     else if (st === 'build' && id) btn('Open your charter');
     else btn('Sign in');
@@ -1655,6 +1658,7 @@ async function signRules() {
   } catch (e) { clearInterval(tick); $('#r-status').innerHTML = `<span class="rule no">✕ ${esc(A.plainError(e).slice(0, 140))}</span>`; b.disabled = false; b.textContent = 'Try again'; }
 }
 
+const testnetGuest = () => { try { if (globalThis.NEARCARTA_NET?.net !== 'testnet') return ''; const g = JSON.parse(localStorage.getItem('nearcarta.guest.v1') || 'null'); return g?.account && g.net === 'testnet' ? g.account : ''; } catch { return ''; } };
 // ---------- wiring ----------
 let booted = null;
 /**
@@ -1690,9 +1694,14 @@ function watchOverflow() {
 function mark(sc) {
   // On a phone the shell makes the PANEL the one scroller and the inner column keeps its height,
   // so watching `sc` alone would leave the hint dead. Watch whichever element actually scrolls.
+  // F57 (film 2026-11-12): the Invoice Shop showed "more below" over an empty panel. Its column is
+  // taller than the fixed tray, but neither element can scroll (overflow hidden/visible), so there was
+  // nothing below to reach. Only an element that really scrolls, with something in it, counts.
   const tray = document.getElementById('tray');
-  const scroller = (tray && tray.scrollHeight > tray.clientHeight + 2) ? tray : sc;
-  const more = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop > 24;
+  const scrolls = (el) => !!el && el.scrollHeight > el.clientHeight + 2 && /(auto|scroll)/.test(getComputedStyle(el).overflowY);
+  const scroller = scrolls(tray) ? tray : (scrolls(sc) ? sc : null);
+  const filled = !!(sc.innerText || '').trim();
+  const more = !!scroller && filled && scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop > 24;
   sc.dataset.more = more ? '1' : '0';
   const hint = tray && tray.querySelector(':scope > .more-hint');
   if (hint) hint.dataset.live = more ? '1' : '0';
