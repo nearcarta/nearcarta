@@ -3,7 +3,7 @@
 // the charter answers on chain. The proof is a one-line receipt after the action.
 import * as W from './wallet.bundle.js';
 import { readSessionAccount } from './session.js';
-import { missingShopLine } from '/panels/toll-room.js';
+import { missingShopLine, unitsWords } from '/panels/toll-room.js';
 import { $, sfx } from './core.js';
 import * as P from './payouts.js';
 import * as TS from './tollsplit.js';
@@ -787,9 +787,83 @@ async function finishCross(shop, order, { reused = false, passTx = null, amount 
     return { ...base, tx: signTx || passTx, reason: 'signing', signTx,
       relay: { ok: false, text: 'Signed on NEAR. The MPC signature is not on the toll yet. Press Finish crossing again in a minute to send it. No second pass is charged.' } };
   }
-  const relay = await api('/api/toll/relay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: Number(cur.tx_nonce) }) })
+  let relay = await api('/api/toll/relay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: Number(cur.tx_nonce) }) })
     .catch(e => ({ ok: false, text: `The relay did not answer (${String(e?.message || e).slice(0, 80)}). Press Finish crossing again to send it. No second pass is charged.` }));
+  // F65 (film 2026-11-12): the relay answers right after the broadcast, before Base has a
+  // receipt, and the room stayed on "a Base receipt is still required". Wait for the receipt
+  // here, from the Base RPC pool, and say paid only on status 1.
+  const hash = relay?.broadcast?.hash || String(relay?.explorer || '').match(/0x[0-9a-fA-F]{64}/)?.[0] || '';
+  if (hash && relay?.claim !== 'paid') relay = await waitBasePaid(hash, cur, relay);
+  else if (hash) relay = paidRelay(hash, cur, await baseReceipt(hash).catch(() => null), relay);
+  if (relay?.claim === 'paid') saveTollDone(cur, { signTx, hash, block: relay.block });
   return { ...base, tx: signTx || passTx, reason: 'ok', signTx, relay };
+}
+
+// ---------- toll: the Base receipt (F65) ----------
+// Base mainnet RPCs that answer the browser (CORS checked 2026-11-12). A null receipt from one
+// may be lag, so the next is asked before the answer is "not yet".
+const BASE_RPCS = ['https://mainnet.base.org', 'https://base-rpc.publicnode.com', 'https://base.drpc.org'];
+export async function baseReceipt(hash) {
+  if (!/^0x[0-9a-fA-F]{64}$/.test(String(hash || ''))) return null;
+  for (const u of BASE_RPCS) {
+    try {
+      const j = await fetch(u, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getTransactionReceipt', params: [hash] }) }).then(r => r.json());
+      const r = j?.result;
+      if (r) return { status: r.status == null ? null : Number(BigInt(r.status)), block: r.blockNumber ? Number(BigInt(r.blockNumber)) : null };
+    } catch { /* next RPC */ }
+  }
+  return null;
+}
+const ethWords = o => `${unitsWords(o?.amount, o?.asset === 'usdc' ? 6 : 18)} ${o?.asset === 'usdc' ? 'USDC' : 'ETH'}`;
+export const paidWords = (o, block) => `✓ Paid on Base · ${ethWords(o)}${block != null ? ` · block ${block}` : ''}`;
+function paidRelay(hash, o, rc, relay = {}) {
+  const explorer = `https://basescan.org/tx/${hash}`;
+  if (rc && rc.status === 1) return { ...relay, ok: true, step: 'paid', claim: 'paid', explorer, hash, block: rc.block, text: paidWords(o, rc.block) };
+  if (rc && rc.status === 0) return { ...relay, ok: false, step: 'failed', claim: 'failed', explorer, hash, block: rc.block, text: `The Base transaction failed on chain (block ${rc.block}). Nothing was paid.` };
+  return { ...relay, explorer, hash, text: 'Sent to Base. The receipt is not in yet; it shows here as soon as Base confirms it.' };
+}
+async function waitBasePaid(hash, o, relay) {
+  let rc = null;
+  for (let i = 0; i < 20 && !rc; i++) {
+    if (i) await new Promise(r => setTimeout(r, 2000));
+    rc = await baseReceipt(hash).catch(() => null);
+  }
+  return paidRelay(hash, o, rc, relay);
+}
+const LS_TOLL_DONE = (owner, id) => `nearcarta.toll.done.${owner}.${id}`;
+function saveTollDone(o, x) { try { localStorage.setItem(LS_TOLL_DONE(o.row_owner, o.id), JSON.stringify(x)); } catch { /* the chain still has it */ } }
+/** The sign_cross tx of one order: this browser's note, else the explorer's index. */
+async function signCrossTx(o) {
+  try { const x = JSON.parse(localStorage.getItem(LS_TOLL_DONE(o.row_owner, o.id)) || 'null'); if (x?.signTx) return x.signTx; } catch { /* read the index */ }
+  try {
+    const j = await fetch(`https://api.nearblocks.io/v1/account/${TS.TOLL_ACCT}/txns-only?method=sign_cross&per_page=25`).then(r => r.json());
+    const t = (j?.txns || []).find(t => t.signer_account_id === o.row_owner && (t.actions || []).some(a => a.method === 'sign_cross' && Number(JSON.parse(a.args || '{}').id) === Number(o.id)));
+    return t?.transaction_hash || null;
+  } catch { return null; }
+}
+async function nearGasWords(h, sender) {
+  const t = await rpc('tx', { tx_hash: h, sender_account_id: sender, wait_until: 'FINAL' }).catch(() => null);
+  if (!t) return '';
+  let g = BigInt(t.transaction_outcome?.outcome?.gas_burnt || 0);
+  for (const r of t.receipts_outcome || []) g += BigInt(r.outcome?.gas_burnt || 0);
+  return g ? `${(Number(g) / 1e12).toFixed(1)} Tgas` : '';
+}
+/**
+ * F65: this row's newest finished crossing (signed on the toll), its Base tx and receipt, and
+ * the sign_cross tx that asked for it. Read-only.
+ */
+export async function tollFinished(owner = S.me) {
+  if (!owner) return null;
+  const list = await rowOrders(TS.TOLL_ACCT, owner);
+  const o = list.filter(x => x.status === 'signed' || x.status === 'confirmed').pop();
+  if (!o) return null;
+  const live = await api('/api/toll/live').catch(() => null);
+  const row = (live?.recent || []).find(r => String(r.nonce) === String(o.tx_nonce) && (!r.sign_path || r.sign_path === o.path));
+  const hash = row?.tx_hash || '';
+  const [rc, signTx] = await Promise.all([hash ? baseReceipt(hash).catch(() => null) : null, signCrossTx(o)]);
+  const gas = signTx ? await nearGasWords(signTx, owner) : '';
+  const relay = hash ? paidRelay(hash, o, rc) : null;
+  return { order: o, nonce: o.tx_nonce, hash, receipt: rc, explorer: relay?.explorer || '', paid: relay?.claim === 'paid', text: relay?.text || '', signTx, gas, amount: ethWords(o) };
 }
 
 /**
