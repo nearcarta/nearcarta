@@ -38,6 +38,9 @@ test('the board wasm deploys for at most 2.1 NEAR and the state size matches the
   assert.equal(MAIN.board.previous.code_hash, 'DYjXmYTLHCwSGJzwXPNc3ZAUjX7d1ewsR3sEJsp5ZkBS');
   assert.equal(MAIN.board.owner, MAIN.root);
   assert.equal(MAIN.board.max_row_yocto, '40000000000000000000000');
+  // The Payouts anchor is gated on anchor_code_hash === code_hash. `anchor` succeeded on the live
+  // build (tx 144AGEfP…, 2026-11-10), so the gate must be open or the anchor button stays blocked.
+  assert.equal(MAIN.board.anchor_code_hash, MAIN.board.code_hash);
   assert.match(readFileSync(new URL('../../../contracts/charter_board/src/lib.rs', import.meta.url), 'utf8'), /fn reap/);
   assert.match(readFileSync(new URL('../../../docs/MAINNET_BOARD.md', import.meta.url), 'utf8'), /close_charter/);
 });

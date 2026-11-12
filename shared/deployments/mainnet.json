@@ -203,8 +203,8 @@
         "deploy_tx": "CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4"
       }
     },
-    "anchor_code_hash": "DYjXmYTLHCwSGJzwXPNc3ZAUjX7d1ewsR3sEJsp5ZkBS",
-    "anchor_note": "`anchor` panics ERR_NO_CHARTER on the live build (code_hash BF1rQSrG…): measured 2026-11-08, tx GaVEzhfvwG1bP8P6LMrmhuvJe5CzUdvBo2RX4dVnKoTH from a visitor row with four receivers. The hydrate fix is in the staged build, so the invoice anchor is offered only once that code hash is on chain.",
+    "anchor_code_hash": "51kKGvtV23SsZL4JCjD1135yqarHAGnBQ7DybLU4GDGX",
+    "anchor_note": "`anchor` works on the live build 51kKGvtV…: tx 144AGEfPVBT8T7WVcgGtwDqSUYBWMLfqL6ihmBG9urf3 (2026-11-10 06:02 UTC, a keeper row) succeeded on board and on the caller. The older build BF1rQSrG… panicked ERR_NO_CHARTER (tx GaVEzhfvwG1bP8P6LMrmhuvJe5CzUdvBo2RX4dVnKoTH, 2026-11-08). The Payouts anchor is offered while this hash equals code_hash.",
     "previous_v2": {
       "code_hash": "BF1rQSrGWMdY5FCizTpSe1qi1JTdYeY786ny8qdpVg4g",
       "wasm_sha256": "982bf6b6666e626d6af267c8a780cf5bb93cd73b2864a68b0c02dca4d07af9a1",
