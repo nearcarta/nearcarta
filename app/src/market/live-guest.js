@@ -58,12 +58,13 @@ const b64 = (bytes) => {
 /**
  * A market move right after the one before it can reach the relayer before its RPC has the new block, so
  * the relayer's balance pre-check still sees the old bag or purse. Those refusals cost nothing (nothing
- * is sent), so the move is tried again a few times, a moment apart.
+ * is sent), so the move is tried again a few times, a moment apart. A stale access-key nonce (ERR_NONCE)
+ * is the same race: the next try reads the key again.
  */
 export async function move(calls, opts = {}) {
   for (let i = 0; ; i++) {
     try { return await moveOnce(calls, opts); } catch (e) {
-      if (i >= 4 || !/^ERR_PRECHECK_(BAG|PURSE)$/.test(String(e?.code || ''))) throw e;
+      if (i >= 4 || !/^(ERR_PRECHECK_(BAG|PURSE)|ERR_NONCE)$/.test(String(e?.code || ''))) throw e;
       await new Promise((r) => setTimeout(r, 1500));
     }
   }
@@ -89,7 +90,7 @@ async function moveOnce(calls, { signer } = {}) {
     return j.result;
   };
   const [accessKey, head] = await Promise.all([
-    rpc('query', { request_type: 'view_access_key', finality: 'final', account_id: s.accountId, public_key: pk.toString() }),
+    rpc('query', { request_type: 'view_access_key', finality: 'optimistic', account_id: s.accountId, public_key: pk.toString() }),
     rpc('block', { finality: 'final' }),
   ]);
   const da = buildDelegateAction({

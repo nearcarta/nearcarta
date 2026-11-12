@@ -74,6 +74,13 @@ export async function runLoop({ onStep = () => {}, doc = document } = {}) {
   return { ok, account: start.account, steps, why: ok ? null : steps.find((x) => x.state === 'failed')?.id };
 }
 
+/** Why the loop stopped, in the failed step's own words. */
+export function stoppedText(r) {
+  const bad = (r.steps || []).find((x) => x.state === 'failed');
+  if (!bad || bad.id === 'account') return `Stopped: ${whyText(r.why)} Nothing else was sent.`;
+  return `Stopped at “${bad.label}”${bad.note ? `: ${bad.note}` : ''}. The steps marked ✓ are real testnet transactions.`;
+}
+
 /** The markup for the runner: one button, then one row per step. */
 export function judgeRunnerMarkup() {
   const net = NET === 'testnet' ? 'TESTNET' : 'MAINNET';
@@ -97,12 +104,14 @@ export function installJudgeRunner({ doc = document } = {}) {
   const list = host.querySelector('[data-testid="run-steps"]');
   const note = host.querySelector('[data-testid="run-loop-note"]');
   const paint = (s) => {
+    // A step that was 'running' is replaced by its result, so each step is one line.
+    const prev = list.querySelector(`[data-testid="run-step-${s.id}"]`);
     const li = doc.createElement('li');
     li.className = `jr-step ${s.state}`;
     li.setAttribute('data-testid', `run-step-${s.id}`);
     const word = s.state === 'running' ? '…' : s.state === 'ok' ? '✓' : '✕';
     li.innerHTML = `<b aria-hidden="true">${word}</b> <span>${esc(s.label)}</span>${s.account ? ` <code>${esc(s.account)}</code>` : ''}${s.url ? ` <a href="${esc(s.url)}" target="_blank" rel="noopener">open ↗</a>` : ''}${s.note ? ` <small>${esc(s.note)}</small>` : ''}`;
-    list.append(li);
+    if (prev) prev.replaceWith(li); else list.append(li);
   };
   host.querySelector('[data-testid="run-loop"]').addEventListener('click', async (e) => {
     const btn = e.currentTarget;
@@ -112,7 +121,7 @@ export function installJudgeRunner({ doc = document } = {}) {
     const r = await runLoop({ doc, onStep: paint });
     note.textContent = r.ok
       ? `Done. ${r.steps.filter((s) => s.hash).length} transactions on testnet, under ${r.account}. Nothing was spent: test NEAR has no value.`
-      : `Stopped: ${whyText(r.why)} Nothing else was sent.`;
+      : stoppedText(r);
     btn.disabled = false;
   });
   return host;
