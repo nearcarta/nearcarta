@@ -40,16 +40,24 @@ export function checkDelegate(sd, pol, { height } = {}) {
 
 /**
  * The access key the delegate names must be fresh (nonce) and either a function-call key on the same
- * receiver, or the one full-access key of an implicit account (an email-login wallet: the account id is
- * the hex of that key). The full key is accepted only because checkDelegate already limits the actions to
- * zero-deposit market moves, so it can spend no NEAR here either.
+ * receiver, or a key that cannot move value through this path at all.
+ *
+ * A FullAccess key is accepted in exactly two cases, both of which `checkDelegate` has already confined
+ * to zero-deposit market moves:
+ *   * the one full-access key of an implicit account (an email-login wallet: the id is the hex of that key);
+ *   * the guest key of a `<name>.play.<parent>` account. The guest made that key in its own browser and
+ *     the funder added it as the account's only key, so there is no function-call key to name instead.
+ * A FullAccess key on any other named account is refused: the relayer will not act as a wallet.
+ *
+ * Docs: https://docs.near.org/protocol/accounts-contracts/access-keys · https://github.com/near/NEPs/blob/master/neps/nep-0366.md
  */
-export function checkKey(key, d, pkHex) {
+export function checkKey(key, d, pkHex, { guestSuffix = '' } = {}) {
   if (!key) return { ok: false, why: 'ERR_NO_KEY' };
   const p = key.permission;
   if (BigInt(d.nonce) <= BigInt(key.nonce)) return { ok: false, why: 'ERR_NONCE' };
   if (p === 'FullAccess') {
     if (pkHex && /^[0-9a-f]{64}$/.test(d.senderId) && d.senderId === pkHex) return { ok: true, implicit: true };
+    if (guestSuffix && String(d.senderId).endsWith(guestSuffix)) return { ok: true, guest: true };
     return { ok: false, why: 'ERR_FULL_ACCESS_KEY' };
   }
   if (!p?.FunctionCall) return { ok: false, why: 'ERR_FULL_ACCESS_KEY' };
