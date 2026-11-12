@@ -72,14 +72,37 @@ async function guard(L, calls) {
   if (!pc.ok) throw Object.assign(new Error(PRE[pc.why] || 'Not yet.'), { code: pc.why, need: pc.need, have: pc.have });
 }
 const send = async (L, calls) => { await guard(L, calls); return L.move(calls); };
-const check = (r) => { if (!r.ok) throw Object.assign(new Error(r.failure?.match(/ERR_[A-Z_]+/)?.[0] || 'The market said no.'), { code: r.failure?.match(/ERR_[A-Z_]+/)?.[0] }); return r; };
+const STORE_MSG = 'Getting your market space ready. Press again in a moment.';
+PRE.ERR_STORAGE = STORE_MSG;
+const check = (r) => { if (!r.ok) { const code = r.failure?.match(/ERR_[A-Z_]+/)?.[0]; throw Object.assign(new Error(PRE[code] || code || 'The market said no.'), { code, hash: r.hash }); } return r; };
+// Every new record on the market (the bag, the purse, a share, a stall) is paid from the citizen's
+// storage deposit there, which the relayer tops up for free (/relay/session). It is checked before each
+// move, so a returning visitor whose earlier days used it up never sends a move the market refuses.
+const STORE_NEED = 5n * MILLI;
+const nap = (ms) => new Promise((r) => setTimeout(r, ms));
+async function storage(L) { try { return BigInt((await L.view('storage_balance_of', { account_id: live.account })) ?? 0); } catch { return null; } }
+async function topUp(L, force = false) {
+  const have = await storage(L);
+  if (!force && (have == null || have >= STORE_NEED)) return;
+  try { await L.ensureSession(); } catch (e) { throw Object.assign(new Error(STORE_MSG), { code: 'ERR_STORAGE', why: e?.code || e?.message }); }
+  for (let i = 0; i < 10; i++) { const s = await storage(L); if (s == null || s >= STORE_NEED) return; await nap(800); }
+}
+/** One market move: storage first, then the move; a storage refusal tops up and tries once more. */
+async function market(L, calls) {
+  await topUp(L);
+  try { return check(await send(L, calls)); } catch (e) {
+    if (!/STORAGE/.test(e.code || '')) throw e;
+    await topUp(L, true); await nap(1500); // the next nonce must be past the refused move's
+    return check(await send(L, calls));
+  }
+}
 
 // The real move behind each story step. Steps with no market move return null (the story runs as before).
 export async function step(id, ctx = {}) {
   if (!live.account) return null;
   const L = await lib();
   if (id === 'cargo') {
-    const r = check(await send(L, ['ferry-1', 'ferry-2', 'ferry-3'].map((node) => ({ method: 'gather', args: { node }, tgas: 15 }))));
+    const r = await market(L, ['ferry-1', 'ferry-2', 'ferry-3'].map((node) => ({ method: 'gather', args: { node }, tgas: 15 })));
     return record(id, 'Unloaded 3 salt at the Ferry', r);
   }
   if (id === 'sell') {
@@ -87,14 +110,13 @@ export async function step(id, ctx = {}) {
     const q = await L.view('quote', { shop: 'arena', good: 'good:salt' });
     const qty = Math.min(3, n); const min = (BigInt(q.sell) * BigInt(qty) * 8n) / 10n;
     const before = await purse();
-    const r = check(await send(L, { method: 'sell', args: { shop: 'arena', good: 'good:salt', qty, min_total: String(min), keep: true }, tgas: 20 }));
+    const r = await market(L, { method: 'sell', args: { shop: 'arena', good: 'good:salt', qty, min_total: String(min), keep: true }, tgas: 20 });
     const after = await purse(); r.total = before != null && after != null ? after - before : null;
     return record(id, `Sold ${qty} salt at the Arena`, r);
   }
   if (id === 'invest') {
     const shop = ctx.shop || 'ferry';
-    await L.ensureSession(); // tops the market storage back up if the day used it
-    const r = check(await send(L, { method: 'purse', args: { action: 'invest', amount: String(MILLI), shop }, tgas: 20 }));
+    const r = await market(L, { method: 'purse', args: { action: 'invest', amount: String(MILLI), shop }, tgas: 20 });
     return record(id, `Invested 10 coins in the ${shop}`, r);
   }
   if (id === 'seal') return sealProfit();
@@ -177,13 +199,12 @@ export async function freeStall(now = Date.now()) {
 /** Rent a stall in the Arena square from the purse. */
 export async function rentStall(stall = 1) {
   const L = await lib();
-  await L.ensureSession();
-  const r = check(await send(L, { method: 'stall', args: { stall, action: 'rent' }, tgas: 20 }));
+  const r = await market(L, { method: 'stall', args: { stall, action: 'rent' }, tgas: 20 });
   return record('stall', `Rented stall ${stall} in the Arena`, r);
 }
 export async function listStall(stall, good, qty, price) {
   const L = await lib();
-  const r = check(await send(L, { method: 'stall', args: { stall, action: 'list', good, qty, price: String(price) }, tgas: 20 }));
+  const r = await market(L, { method: 'stall', args: { stall, action: 'list', good, qty, price: String(price) }, tgas: 20 });
   return record('stall', `Put ${qty} ${good.slice(5)} on stall ${stall}`, r);
 }
 export async function square() { try { return await (await lib()).view('square', { account_id: live.account }); } catch { return null; } }

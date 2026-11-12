@@ -8,9 +8,14 @@ const B = (v) => BigInt(v ?? 0);
 // mainnet: an invest refused ERR_STORAGE with 0.00324 left (tx 7DnRUbEzLXAcPz73WTkBUQjeyW3UbdQJMS9X3haDrwfm).
 export const STORAGE_NEED = 5n * 10n ** 21n; // 0.005 NEAR
 const lowStorage = (s) => s.storage != null && B(s.storage) < STORAGE_NEED;
+// No storage at all: even a gather or a sale writes a record (the bag, the purse), so the market would
+// panic ERR_STORAGE after the relayer paid the gas (mainnet txs GxuiKpYj…, B6CZ63tx…).
+const noStorage = (s) => s.storage != null && B(s.storage) === 0n;
+const NO_STORAGE = { ok: false, why: 'ERR_PRECHECK_STORAGE', need: STORAGE_NEED.toString(), have: '0' };
 export function precheck(calls, s) {
   let purse = B(s.purse); const bag = { ...(s.bag || {}) }; let soldIntoPurse = false, gathered = false;
   for (const { method, args = {} } of calls) {
+    if ((method === 'gather' || method === 'sell') && noStorage(s)) return NO_STORAGE;
     if (method === 'gather') {
       // The market's per-player day caps (get_config caps, get_citizen counters), when the caller read them.
       if (s.caps && s.citizen && Number(s.citizen.gathers_today) + 1 > Number(s.caps.gathers_per_day)) return { ok: false, why: 'ERR_PRECHECK_GATHER_CAP' };
