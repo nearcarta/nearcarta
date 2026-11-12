@@ -35,6 +35,7 @@ const grab = (re) => { const m = tap.match(re); if (!m) throw new Error('unit su
 const unitPass = grab(/^# pass (\d+)/m), unitFail = grab(/^# fail (\d+)/m), unitSkip = grab(/^# skipped (\d+)/m);
 if (unitFail) throw new Error(`${unitFail} unit tests fail; fix them before writing numbers`);
 
+const e2eTotal = e2e.expected + e2e.unexpected + e2e.flaky + e2e.skipped;
 const n = {
   unit: unitPass,
   proofsFound: rows.filter(r => r.found).length, proofs: rows.length,
@@ -48,18 +49,14 @@ const n = {
 
 const edits = {
   'README.md': [
-    // The proof count appears three times in this file — the commands block, the verify table and
-    // the run block. Without this rule none of them was ever checked, so the README still claimed
-    // 106 in all three places after the proof set grew to 108. It is first because the other rules
-    // must not be able to mask it.
+    // The proof count appears in several places (the badge row, the tests table, the commands block).
+    // The replace below is global, so every copy is rewritten.
     [/\d+\/\d+ mainnet txs found/, `${n.proofsFound}/${n.proofs} mainnet txs found`],
-    [/# \d+ backend unit tests \(\d+ pass, \d+ skipped\)/, `# ${n.unit + unitSkip} backend unit tests (${n.unit} pass, ${unitSkip} skipped)`],
+    [/\d+ backend unit tests \(\d+ pass, \d+ skipped\)/, `${n.unit + unitSkip} backend unit tests (${n.unit} pass, ${unitSkip} skipped)`],
     [/npm test\s+# \d+ unit tests \(\d+ pass, \d+ skipped\)/, `npm test                 # ${n.unit + unitSkip} unit tests (${n.unit} pass, ${unitSkip} skipped)`],
-    [/# \d+ unit tests \(\d+ pass, \d+ skipped\):/, `# ${n.unit + unitSkip} unit tests (${n.unit} pass, ${unitSkip} skipped):`],
-    [/\(\d+\/\d+ expected\)/, `(${n.proofsFound}/${n.proofs} expected)`],
-    [/npm run e2e   # \d+ browser tests/, `npm run e2e   # ${n.e2e} browser tests`],
-    [/`judges\/proofs\/e2e-vercel.json`: \d+ passed, \d+ skipped/, `\`judges/proofs/e2e-vercel.json\`: ${n.vercelPassed} passed, ${n.vercelSkipped} skipped`],
-    [/the agent charter \(Rust, near-sdk\)\. \d+ unit tests/, `the agent charter (Rust, near-sdk). ${n.oath} unit tests`],
+    [/\d+ Playwright browser tests in the last recorded full run \(\d{4}-\d\d-\d\d\): \d+ passed, \d+ flaky, \d+ skipped/,
+      `${e2eTotal} Playwright browser tests in the last recorded full run (${e2e.startTime ? String(e2e.startTime).slice(0, 10) : 'unknown'}): ${e2e.expected} passed, ${e2e.flaky} flaky, ${e2e.skipped} skipped`],
+    [/cargo test --lib\s+# \d+ passed/, `cargo test --lib     # ${n.oath} passed`],
   ],
   'judges/VERIFY.md': [
     [/\d+\/\d+ mainnet txs found/, `${n.proofsFound}/${n.proofs} mainnet txs found`],
