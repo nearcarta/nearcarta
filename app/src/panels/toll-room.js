@@ -756,7 +756,8 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
     paint();
     const res = await hooks.onPay({ ...quote, to: plan.to, asset: plan.asset, amount: plan.amount });
     state.pending = '';
-    if (!res?.ok) state.seal = res?.hint || '';
+    // F61: a crossing step (signed, relayed, or still to sign) keeps its sentence on screen.
+    if (!res?.ok || res?.crossing) state.seal = res?.hint || '';
     else state.seal = '';
     if (res?.refused) hooks.showRefuse?.(state.seal);
     else hooks.hideRefuse?.();

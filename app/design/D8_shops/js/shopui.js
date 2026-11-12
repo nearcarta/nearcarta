@@ -576,6 +576,7 @@ function chronicleRead() {
 const capFmt = 0;
 // Plain names for accounts a visitor sees; the raw id stays in the tooltip and under "advanced".
 export const nice = a => { if (!a) return ''; if (a === A.S.me) return 'You'; const m = A.merchants?.() || [];
+  if (/^toll\./.test(a) && cur !== 'arena') return 'Toll'; // F61: the arena lists toll.* as its Bookshop merchant
   if (a === m[0]) return 'Café'; if (a === m[1]) return 'Bookshop'; if (a === 'townhall.nearcarta.near') return 'Town Hall'; if (/^lamp\./.test(a)) return 'Lamplighter (your agent)';
   if (/gate/.test(a)) return 'Toll gate'; if (/treasury/.test(a)) return 'Town treasury'; return a.split('.')[0]; };
 // Progress for the long actions: plain steps with a time hint, ticking while the button is busy.
@@ -750,6 +751,17 @@ async function tollPay(quote) {
     extra.seal = hint;
     sh?.showRefuse?.(hint);
     return { ok: false, hint, refused: true, keep: true, kind: 'no', say: hint };
+  }
+  // F61: the crossing's later steps (sign_cross, MPC answer, Base relay) speak for themselves,
+  // whether this press paid a new pass or finished one already paid.
+  if (o && o.decision === 'allowed' && (o.relay || o.needsSignature)) {
+    const hint = o.needsSignature ? (o.note || 'The pass is paid. Press Pay on Base again to sign the crossing. No second pass is charged.') : (o.relay.text || 'The relay did not answer. Nothing moved on Base.');
+    if (o.tx && !o.reused) rememberTollPass({ h: o.tx, decision: 'allowed', reason: '', label: `${quote.feeNear} NEAR pass` });
+    extra.seal = hint;
+    if (o.tx) extra.passTx = o.tx;
+    const paid = !!o.relay?.ok || o.relay?.claim === 'paid';
+    if (paid) { sh?.hideRefuse?.(); if (sh?.act && runScene) runScene(sh.act({ success: true })); }
+    return { ok: paid, o, tx: o.tx, hint, success: paid, crossing: true, needsSignature: !!o.needsSignature, keep: true, kind: paid ? 'ok' : 'no', say: hint, rc: o.tx ? A.txLine(o.tx) : '' };
   }
   if (!o || o.decision !== 'allowed' || !o.tx) {
     const hint = tollRefusal(A.why(o?.reason)) || 'The charter did not allow this pass. Nothing moved on Base.';
@@ -1021,6 +1033,8 @@ const APPS = {
         sendCancel: (p) => A.guardCancel(p),
         // F38: the board's own list of open holds, so a hold made before a reload still shows Confirm.
         holds: () => (typeof A.boardHoldIds === 'function' ? A.boardHoldIds() : Promise.resolve(null)),
+        // F62: amount, payee and whether the board can release it, for the held card.
+        holdInfo: (id) => (typeof A.boardHoldInfo === 'function' ? A.boardHoldInfo(id) : Promise.resolve(null)),
         row: () => !!(A.S.board && A.S.boardRow),
         frozen: () => !!A.S.state?.frozen,
         // Same board-row blind spot as Arena: read the live row first.
