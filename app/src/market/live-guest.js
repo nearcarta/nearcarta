@@ -211,20 +211,36 @@ const coinText = (y) => { const t = (BigInt(y || 0) * 10n) / 10n ** 20n; return 
 async function topUpPurse({ rounds = 3 } = {}) {
   let have = await purse();
   let hash = null;
-  for (let k = 0; have != null && have < MILLI && k < rounds; k++) {
-    const wait = lastGather + GATHER_GAP_MS - Date.now();
-    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-    const g = await move(FERRY_NODES.map((node) => ({ method: 'gather', args: { node }, tgas: 15 })));
-    lastGather = Date.now();
-    hash = g?.hash || hash;
-    const q = await view('quote', { shop: 'arena', good: 'good:salt' });
-    const min = q?.sell ? (BigInt(q.sell) * 3n * 7n) / 10n : 1n;
-    const r = await move({ method: 'sell', args: { shop: 'arena', good: 'good:salt', qty: 3, min_total: String(min), keep: true }, tgas: 20 });
+  for (let k = 0; have != null && have < MILLI && k < rounds + 1; k++) {
+    // Sell only what the bag really holds. A gather that lands ERR_TOO_SOON (the node's 30 s clock is
+    // the block's, not this browser's) mints nothing, and selling 3 then is refused ERR_PRECHECK_BAG:
+    // that is what stalled the one-click run on prod (2026-11-12).
+    let salt = await saltInBag();
+    if (salt < 3) {
+      const wait = lastGather + GATHER_GAP_MS - Date.now();
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      const g = await move(FERRY_NODES.map((node) => ({ method: 'gather', args: { node }, tgas: 15 }))).catch((e) => ({ ok: false, failure: String(e?.code || e?.message || e) }));
+      lastGather = Date.now();
+      if (g?.ok !== false && g?.hash) hash = g.hash;
+      salt = await waitForSalt(salt + 1);
+    }
+    if (salt < 1) continue;
+    const qty = Math.min(3, salt);
+    const q = await view('quote', { shop: 'arena', good: 'good:salt' }).catch(() => null);
+    const min = q?.sell ? (BigInt(q.sell) * BigInt(qty) * 7n) / 10n : 1n;
+    const r = await move({ method: 'sell', args: { shop: 'arena', good: 'good:salt', qty, min_total: String(min), keep: true }, tgas: 20 }).catch(() => null);
     hash = r?.hash || hash;
     await new Promise((r2) => setTimeout(r2, 1500));
     have = await purse();
   }
   return { have, hash, short: have != null && have < MILLI };
+}
+const saltInBag = async () => { try { return Number(await view('mt_balance_of', { account_id: account(), token_id: 'good:salt' })) || 0; } catch { return 0; } };
+/** The relayer's pre-check reads final state, a block or two behind the gather it just sent. */
+async function waitForSalt(want, ms = 9000) {
+  const end = Date.now() + ms; let n = await saltInBag();
+  while (n < want && Date.now() < end) { await new Promise((r) => setTimeout(r, 1200)); n = await saltInBag(); }
+  return n;
 }
 const purse = async () => { try { const sq = await view('square', { account_id: account() }); return BigInt(sq?.purse ?? 0n); } catch { return null; } };
 
@@ -245,7 +261,7 @@ export async function step(id, ctx = {}) {
   }
   if (id === 'sell') {
     const q = await view('quote', { shop: 'arena', good: 'good:salt' });
-    const n = 3;
+    const n = Math.max(1, Math.min(3, await waitForSalt(3)));
     const min = q?.sell ? (BigInt(q.sell) * BigInt(n) * 8n) / 10n : 1n;
     const before = await purse();
     const r = await move({ method: 'sell', args: { shop: 'arena', good: 'good:salt', qty: n, min_total: String(min), keep: true }, tgas: 20 });
