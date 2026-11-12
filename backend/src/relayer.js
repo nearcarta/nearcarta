@@ -123,7 +123,10 @@ export async function session(accountId, { acc = () => relayer(), viewAcc = view
   if (!/^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/.test(id)) return refuse('ERR_ACCOUNT');
   const implicit = /^[0-9a-f]{64}$/.test(id);
   const isGuest = !!guestOf && id.endsWith(guestOf);
-  const exists = isGuest ? true : await (async () => { try { await viewAcc(id); return true; } catch { return false; } })();
+  // A guest must exist: anyone can type a name under the guest parent, and a storage deposit for a name
+  // nobody created would spend the relayer's float on nothing.
+  let exists = true; try { await viewAcc(id); } catch { exists = false; }
+  if (isGuest && !exists) return refuse('ERR_NO_ACCOUNT');
   if (!exists && !implicit) return refuse('ERR_NO_ACCOUNT');
   const stored = storageOf ? await storageOf(id) : BigInt(await view(c.market, 'storage_balance_of', { account_id: id }).catch(() => '0'));
   // A guest already holds NEAR from its funder: only its market storage is topped up here.
