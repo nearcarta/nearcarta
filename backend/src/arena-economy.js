@@ -43,8 +43,18 @@ export function removedMarket(week = 0) {
   };
 }
 
+/** The live arena account runs the market crate when `get_config` reports market caps. */
+export async function isMarket(viewFn, contract = ARENA) {
+  try { const c = await viewFn(contract, 'get_config', {}); return !!(c && c.caps && 'gathers_per_day' in c.caps); } catch { return false; }
+}
+
 export async function readGuardians(viewFn, contract = ARENA) {
   if (typeof viewFn !== 'function') return guardiansPayload([]);
+  // On mainnet arena.nearcarta.near is the market: it has no guardians, `fund` or `attempt`.
+  // Say so plainly, so the tray shows the market instead of buttons the contract cannot answer.
+  if (await isMarket(viewFn, contract)) {
+    return { ...guardiansPayload([]), market: true, live: 'market', note: `${contract} runs the city market (sell, buy, quote, stalls). It has no guardians.` };
+  }
   try {
     const tokens = await viewFn(contract, 'nft_tokens', { from_index: '0', limit: 20 });
     return guardiansPayload(Array.isArray(tokens) ? tokens : []);

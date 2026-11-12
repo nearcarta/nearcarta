@@ -281,7 +281,7 @@ async function stripClick(a, b) {
       lastDone = { shop: inShop, step, res }; lastDeed = { shop: inShop, text: DEED[step.id] };
       save(); hud(); quest(); seal(b); whyOpen = false; flash = null; readPurse();
     } else if (a === 'why') whyOpen = !whyOpen;
-    else if (a === 'stall') { if (busy) return; busy = true; flash = { shop: inShop, text: 'One moment…' }; paintStrip(); try { await R.rentStall(1); R.live.stall = 1; flash = { shop: inShop, text: 'Stall 1 is yours for a week' }; readPurse(); } finally { busy = false; } }
+    else if (a === 'stall') { if (busy) return; busy = true; flash = { shop: inShop, text: 'One moment…' }; paintStrip(); try { const id = await R.freeStall(); if (id == null) throw Object.assign(new Error('Every stall is held this week.'), { code: 'ERR_PRECHECK_STALL_TAKEN' }); await R.rentStall(id); R.live.stall = id; flash = { shop: inShop, text: `Stall ${id} is yours for a week` }; readPurse(); } finally { busy = false; } }
     else if (a === 'sell') { const t = S.sell(city, Q.ME, 'arena', b.dataset.good, +b.dataset.n); flash = { shop: inShop, text: `Sold for ${coins(t)} coins` }; save(); hud(); }
     else if (a === 'collect') { let got = 0, good = null; for (const [n, g] of S.nodesAt(inShop)) { try { got += S.gather(city, Q.ME, n); good = g; } catch {} } if (got) flash = { shop: inShop, text: `+${got} ${GOOD(good).toLowerCase()} in your bag` }; save(); hud(); }
     else if (a === 'next' || a === 'there') { lastDone = null; strip.hide(); await WD().exitShop?.(); if (Q.current(city)) setTimeout(go, 350); return; }

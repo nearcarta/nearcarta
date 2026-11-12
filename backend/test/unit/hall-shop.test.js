@@ -169,9 +169,10 @@ test('bounty rows come from the view and an empty chain is empty', async () => {
   assert.equal(nearOf(rows[0].amount), '0.001');
   const seen = [];
   const body = await readBounties({
-    view: async (id, method) => { seen.push(method); return method === 'get_bounties' ? [] : { frozen: false }; },
+    view: async (id, method) => { seen.push(method); if (method === 'get_hall') throw new Error('MethodNotFound'); return method === 'get_bounties' ? [] : { frozen: false }; },
   });
-  assert.deepEqual(seen, ['get_state', 'get_bounties']);
+  // get_hall is tried first (the live hall crate); this mock has none, so the legacy views answer.
+  assert.deepEqual(seen, ['get_hall', 'get_state', 'get_bounties']);
   assert.deepEqual(body.bounties, []);
   assert.equal(body.contract, 'townhall.nearcarta.near');
 });
@@ -419,4 +420,15 @@ test('Agents tab does not show Post job, and the market gap is honest', () => {
     form: { task: '', budget: '', deadline: '24', parts: '2', workerA: '', workerB: '', quotePart: '1', quoteWorker: '', quoteNear: '', deliverable: '' },
   });
   assert.match(post, /data-action="post"/);
+});
+
+test('the live hall crate answers with its jobs instead of an error', async () => {
+  const jobs = { 0: null, 1: { task: 'smoke', budget: '1000000000000000000000', remaining: '0', parts: [{ worker: null }] } };
+  const body = await readBounties({
+    view: async (id, method, args) => method === 'get_hall' ? { owner: 'nearcarta.near', next_id: '2', jobs: 1 } : method === 'get_job' ? jobs[Number(args.job_id)] : (() => { throw new Error('MethodNotFound'); })(),
+  });
+  assert.equal(body.kind, 'hall');
+  assert.equal(body.error, undefined);
+  assert.equal(body.jobs.length, 1);
+  assert.deepEqual(body.bounties[0], { hash: 'job-1', amount: '1000000000000000000000', remaining: '0', task: 'smoke', claimedBy: null, policyVersion: null });
 });

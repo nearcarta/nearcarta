@@ -1,6 +1,6 @@
 // City tray for Vault Arena. Guardians, Attack, and Score use the Ferry card.
 // Mint and Attack call the same planner as the agent dock. Neither signs.
-import { API_PATH } from '../../../../shared/net/net.js';
+import { API_PATH, txUrl, addrUrl } from '../../../../shared/net/net.js';
 import { attackAt, advanceAttack } from '../../../design/D8_shops/shops/arenalive.js';
 import { NEXT_LABEL } from '../../../design/D8_shops/shops/arena-labels.js';
 import { tokenStack } from '../token-badge.js';
@@ -35,7 +35,44 @@ function input(name, value, placeholder) {
   return `<input name="${name}" value="${esc(value || '')}" placeholder="${esc(placeholder || '')}" autocomplete="off">`;
 }
 
+// 1 coin = 0.0001 NEAR (10 coins buy a 0.001 NEAR share in Market Day).
+const coinsOf = y => { try { return (Number(BigInt(y || 0) / 10n ** 16n) / 1e4).toFixed(2).replace(/\.?0+$/, ''); } catch { return '?'; } };
+const nearOf = y => { try { return (Number(BigInt(y || 0) / 10n ** 18n) / 1e6).toString(); } catch { return '?'; } };
+const goodName = g => String(g || '').replace(/^good:/, '');
+const shortAcct = s => { const t = String(s || ''); return t.length > 18 ? `${t.slice(0, 8)}…${t.slice(-6)}` : t; };
+
+/**
+ * On mainnet arena.nearcarta.near runs the city market, not guardians. This card shows the
+ * contract's real state (quotes, stalls, rules, council) and sends trades to Market Day, where
+ * they are relayed with no popup. No button here can call a method the contract lacks.
+ */
+export function marketHtml(state) {
+  const m = state.mkt || {};
+  const quotes = Array.isArray(m.quotes) ? m.quotes : [];
+  const stalls = Array.isArray(m.stalls) ? m.stalls : [];
+  const rows = quotes.length
+    ? quotes.map(q => `<li data-testid="arena-quote"><b>${esc(goodName(q.good))}</b> · buy ${esc(coinsOf(q.buy))} coins · sell ${esc(coinsOf(q.sell))} coins${q.reasons?.[0]?.why ? ` <small>(${esc(q.reasons[0].why)})</small>` : ''}</li>`).join('')
+    : `<li>${state.mktError ? 'The market did not answer.' : 'Reading the market…'}</li>`;
+  const stallRows = stalls.map(s => `<li data-testid="arena-stall">Stall ${esc(s.id)} · ${s.held ? `held by ${esc(shortAcct(s.holder))}${s.good ? `, selling ${esc(s.qty)} ${esc(goodName(s.good))}` : ''}` : '<b>free</b>'}</li>`).join('');
+  const rent = m.rules ? `Rent ${esc(nearOf(m.rules.stall_rent))} NEAR for ${esc(m.rules.stall_days)} days · price floor ${esc((m.rules.floor_bps || 0) / 100)}%` : '';
+  const council = m.council ? `Council: ${esc((m.council.members || []).length)} keepers, quorum ${esc(m.council.quorum)}` : '';
+  const contract = esc(m.contract || 'arena.nearcarta.near');
+  return `<div class="ferry-card" data-testid="arena-live" data-kind="market">
+    <div class="ferry-tabs" role="tablist"><button type="button" class="ferry-tab" role="tab" aria-selected="true">Market</button></div>
+    <div class="ferry-pane">
+      ${flow('Goods', 'Coins')}
+      <p class="arena-status">Live prices on <a href="${esc(addrUrl(m.contract || 'arena.nearcarta.near'))}" target="_blank" rel="noopener">${contract}</a>. Each price is set by the shelf, the hour's demand and the shop's mood.</p>
+      <ul class="arena-guardians" data-testid="arena-quotes">${rows}</ul>
+      ${stallRows ? `<ul class="arena-guardians" data-testid="arena-stalls">${stallRows}</ul>` : ''}
+      ${rent ? `<p class="arena-status">${rent}</p>` : ''}${council ? `<p class="arena-status">${council}</p>` : ''}
+      <div class="arena-actions"><a class="primary ferry-cta" data-testid="arena-trade" href="/?play">Trade in Market Day</a></div>
+      <p class="arena-status">Sells, buys and stall rent run from your purse in Market Day: no popup, the city pays the gas.</p>
+    </div>
+  </div>`;
+}
+
 export function arenaHtml(state, attackAttr = 'data-testid="arena-attack"', boxAttr = 'class="attack-box" rows="6"') {
+  if (state.market) return marketHtml(state);
   const tab = state.tab || 'guardians';
   const mode = state.mode || 'mint';
   const tabBtn = (id, label) => `<button type="button" class="ferry-tab" role="tab" data-tab="${id}" aria-selected="${tab === id ? 'true' : 'false'}">${label}</button>`;
@@ -155,6 +192,9 @@ export function mountArenaTray(root, hooks = {}, attackAttr, boxAttr) {
   const arm = () => {
     armArenaDock(async (text) => {
       const cmd = parseCommand(text);
+      if (state.market && cmd.kind !== 'score') {
+        return { ok: false, hint: 'This arena is the city market: trade salt, iron, timber and herbs in Market Day. Nothing was signed.' };
+      }
       if (cmd.kind === 'score') {
         state.tab = 'score';
         await loadScore();
@@ -189,6 +229,12 @@ export function mountArenaTray(root, hooks = {}, attackAttr, boxAttr) {
       const body = await res.json();
       state.listError = false;
       state.guardians = Array.isArray(body.guardians) ? body.guardians : [];
+      state.market = !!body.market;
+      if (state.market) {
+        try { state.mkt = await (await fetch(api() + API_PATH + '/arena', { cache: 'no-store' })).json(); state.mktError = !state.mkt || state.mkt.kind !== 'market'; }
+        catch { state.mktError = true; }
+        return;
+      }
       state.budget = body.inference_budget;
       state.live = body.live || 'blocked';
       if (!state.status) state.status = state.guardians.length ? 'Deployed token. Not an arena v2 pot.' : '';
