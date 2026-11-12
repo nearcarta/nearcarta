@@ -46,8 +46,10 @@ test('the rules step reads the chain row itself', () => {
   const setup = read('app/house/setup.js');
   // ensureChainRow used to run only on the Sign step, so the rules guard had no row to look
   // at and skipped itself. The rules step must trigger the read too.
-  assert.match(setup, /STEPS\[st\.step\]\[0\] === 'rules' && boardLive\(\) && !st\.trial && !chainRow/);
-  assert.match(setup, /ensureChainRow\(\)\.then\(\(\) => \{ if \(STEPS\[st\.step\]\[0\] === 'rules'\) render\(\); \}\)/);
+  // It reads once per account and does not repaint from the read (that loop froze the tab, F9).
+  assert.match(setup, /if \(STEPS\[st\.step\]\[0\] === 'rules'\) kickRulesRowRead\(\);/);
+  assert.match(setup, /if \(!boardLive\(\) \|\| st\.trial \|\| !me \|\| chainRow \|\| chainLoadedFor === me \|\| rulesRowRead\) return false;/);
+  assert.match(setup, /rulesRowRead = ensureChainRow\(\)/);
 });
 
 test('a full row rewrites the call list before the rules so a new shop can fit', () => {
