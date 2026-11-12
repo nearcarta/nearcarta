@@ -75,7 +75,12 @@ class PrivySigner extends Signer {
 
 async function post(path, body) {
   const r = await fetch(API() + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  const j = await r.json().catch(() => ({})); if (!r.ok || j.ok === false) throw Object.assign(new Error(j.why || j.error || `http ${r.status}`), { code: j.why, res: j }); return j;
+  const j = await r.json().catch(() => ({}));
+  // A move the relayer sent that the market then refused comes back 200 with ok:false, a hash and the
+  // chain's failure: hand it back (the caller names the ERR_ code and links the hash), never 'http 200'.
+  if (r.ok && j.ok === false && j.hash) return j;
+  const code = j.why || j.failure?.match(/ERR_[A-Z_]+/)?.[0];
+  if (!r.ok || j.ok === false) throw Object.assign(new Error(code || j.error || `http ${r.status}`), { code, res: j }); return j;
 }
 
 /** First visit: the relayer opens the wallet and pays its market storage. Safe to call again. */
