@@ -35,14 +35,16 @@ const NODE_SHIM = { js: "const process = globalThis.process ?? { env: { NODE_ENV
 mkdirSync(dist + '/market', { recursive: true });
 await (await import('esbuild')).build({
   entryPoints: [here + 'src/market/live-guest.js'], bundle: true, format: 'esm', target: 'es2022',
-  outfile: dist + '/market/live-guest.js', logLevel: 'warning', banner: NODE_SHIM,
+  outfile: dist + '/market/live-guest.js', logLevel: 'warning', banner: NODE_SHIM, minify: true, // F63: 508 KB / 279 KB unminified on the guest's first press
+ 
   define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis' },
 });
 // guest/key.js imports near-api-js through guest/near.js. The raw copy of that file names a bare package a
 // browser cannot resolve, so it is replaced by its bundle.
 await (await import('esbuild')).build({
   entryPoints: [here + 'src/guest/near.js'], bundle: true, format: 'esm', target: 'es2022',
-  outfile: dist + '/guest/near.js', allowOverwrite: true, logLevel: 'warning', banner: NODE_SHIM,
+  outfile: dist + '/guest/near.js', allowOverwrite: true, logLevel: 'warning', banner: NODE_SHIM, minify: true, // F63: 508 KB / 279 KB unminified on the guest's first press
+ 
   define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis' },
 });
 // The Ferry checks quotes with the server's own guard (dependency-free module), so the two cannot drift.
