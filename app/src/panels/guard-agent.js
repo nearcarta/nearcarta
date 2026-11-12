@@ -230,9 +230,11 @@ export async function runGuardAction(plan, ctx = {}) {
     } else if (result.status === 'held') state.notice = 'Held for confirm_hold. The agent cannot confirm.';
     else if (result.status === 'prepared') state.notice = 'Allow matched. Pay through guard signs it.';
     else if (verdict === 'block') state.notice = 'Blocked. No call was built.';
+    // F27: the words a visitor sees are what the live send did (tx, hold, or the reason it did not
+    // go), not the offline book's "Allow matches… Pay through guard sends it".
     return {
       ...result, action: 'pay', propose: false, lamps: lampsFor(state.chk), seal: result.status === 'refunded' || result.status === 'held',
-      verdict: state.bound?.verdict, live: live || undefined,
+      verdict: state.bound?.verdict, live: live || undefined, hint: (live ? state.notice : '') || result.hint, ok: live ? !!live.ok : result.ok,
     };
   }
 
