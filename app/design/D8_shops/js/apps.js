@@ -306,6 +306,19 @@ export async function houseMint({ capYocto = '50000000000000000000000', depositY
 export async function houseCall(plan, { receiver, method } = {}) {
   if (!plan || !plan.call) throw new Error('Nothing to send. Nothing was signed.');
   if (!S.board) throw new Error('Set up your agent in /setup. Nothing was signed.');
+  // F61 (film 2026-11-12): a pass that was paid but never signed (sign_cross did not go out)
+  // left an open order on the toll, and the next press charged a second 0.001 NEAR pass. An
+  // open or unbroadcast order of this row is finished first: no new pass, no new fee.
+  const wanted = { to: String(quote.to || '').toLowerCase(), asset: quote.asset };
+  // A `signed` order whose Base receipt already succeeded is done; the relay says `paid` and
+  // re-sends nothing, and this press then buys a new pass as usual.
+  const mineNow = (await rowOrders(TS.TOLL_ACCT, S.me)).filter(o => o.status === 'open' || o.status === 'signing' || o.status === 'signed').reverse();
+  for (const o of mineNow) {
+    if (o.status === 'open' && !(o.to === wanted.to && o.asset === wanted.asset)) continue;
+    const done = await finishCross(TS.TOLL_ACCT, o, { reused: true });
+    if (done.relay?.claim === 'paid' && o.status === 'signed') continue;
+    return done;
+  }
   const key = agent();
   const ak = key ? await proposeAccessKey(key) : null;
   if (!key || !ak) throw new Error('Set up your agent in /setup. Nothing was signed.');
@@ -626,23 +639,19 @@ export async function toll(quote) {
     // Step two: the row owner signs the stored order. This is what starts the MPC
     // sign; the board's 30 Tgas call only recorded it. A failure here is reported as
     // a stored order that still needs its signature, not a payment.
-    const orderId = await findOrder(shop, nonce);
-    let signedTx = null;
-    if (orderId != null) {
-      try { signedTx = await sign(shop, [fc('sign_cross', { id: orderId }, 150)]); }
-      catch (e) {
-        const why = String(e?.message || e).slice(0, 140);
-        return settled('toll', {
-          tx: signed.hash, decision: 'allowed', reason: 'stored', action: nonce, amount: deposit, receiver: shop, signer: 'agent',
-          needsSignature: true,
-          note: `The board stored the crossing. This browser could not sign it: ${why}`,
-        });
-      }
+    settled('toll', { tx: signed.hash, decision: 'allowed', reason: 'ok', action: nonce, amount: deposit, receiver: shop, signer: 'agent' });
+    // The order id comes from the toll's own list, read until it shows this action (FINAL can
+    // still trail a few hundred ms on the view RPC). Then the same press goes on to sign it.
+    let order = null;
+    for (let i = 0; i < 6 && !order; i++) {
+      if (i) await new Promise(r => setTimeout(r, 1200));
+      order = (await rowOrders(shop, S.me)).find(o => String(o.action_id) === String(nonce)) || null;
     }
-    return settled('toll', {
-      tx: signed.hash, decision: 'allowed', reason: 'ok', action: nonce, amount: deposit,
-      receiver: shop, signer: 'agent', orderId, signTx: signedTx, needsSignature: orderId == null,
-    });
+    if (!order) {
+      return { tx: signed.hash, decision: 'allowed', reason: 'stored', action: nonce, amount: deposit, receiver: shop, signer: 'agent', needsSignature: true,
+        note: 'The pass is paid and the crossing is stored. Press Pay on Base again to sign it. No second pass is charged.' };
+    }
+    return finishCross(shop, order, { passTx: signed.hash, amount: deposit });
   } catch (e) {
     const code = refusalOf(e);
     if (code || e.tx) return settled('toll', { tx: e.tx || null, decision: 'denied', reason: code || String(e.message || e).slice(0, 160), action: nonce, amount: deposit, receiver: shop, fromChain: !!e.tx });
@@ -650,20 +659,59 @@ export async function toll(quote) {
   }
 }
 
-
-/** The order the toll just recorded for this action id, so the row owner can sign it. */
-async function findOrder(shop, actionId) {
-  // `get_order` is keyed by the toll's own id, which the board's return value does not
-  // surface to the browser. Read the few ids past the live nonce and match the action.
-  try {
-    const live = await W.viewFn(rpc, shop, 'policy', {});
-    const n = Number(live?.next_nonce ?? 0);
-    for (let id = Math.max(0, n - 6); id < n + 3; id++) {
-      const o = await W.viewFn(rpc, shop, 'get_order', { id }).catch(() => null);
-      if (o && String(o.action_id) === String(actionId)) return id;
+/**
+ * Every crossing this row has on the toll, oldest first. `get_order` ids are dense from 0, so the
+ * walk stops at the first missing id. A read that errors is retried, never taken as "none".
+ */
+export async function rowOrders(shop, owner) {
+  const out = [];
+  for (let id = 0; id < 64; id++) {
+    let o;
+    for (let t = 0; t < 3; t++) {
+      o = await W.viewFn(rpc, shop, 'get_order', { id }).then(v => v ?? null, () => undefined);
+      if (o !== undefined) break;
+      await new Promise(r => setTimeout(r, 500));
     }
-  } catch { /* no order read: the caller reports that a signature is still needed */ }
-  return null;
+    if (o === undefined || o === null) break;
+    if (o.row_owner === owner) out.push(o);
+  }
+  return out;
+}
+
+/**
+ * F61: one stored crossing to the end. `open`: the row owner signs `sign_cross` (wallet, 150 Tgas,
+ * no deposit). `signing`: wait for the MPC answer. `signed`: relay that one raw transaction to
+ * Base by its toll nonce. No step here pays the NEAR pass again.
+ */
+async function finishCross(shop, order, { reused = false, passTx = null, amount = '0' } = {}) {
+  const base = { decision: 'allowed', action: String(order.action_id), amount: reused ? '0' : amount, receiver: shop, orderId: order.id, reused };
+  let signTx = null;
+  let cur = order;
+  if (cur.status === 'open') {
+    try { signTx = await sign(shop, [fc('sign_cross', { id: Number(order.id) }, 150)]); }
+    catch (e) {
+      const why = userCancelled(e) ? 'the wallet was closed' : String(e?.message || e).slice(0, 140);
+      return { ...base, tx: passTx, reason: 'stored', needsSignature: true,
+        note: `The pass is paid and the crossing is stored, but it is not signed yet (${why}). Press Pay on Base again to sign it. No second pass is charged.` };
+    }
+    if (signTx) keep(signTx, 'toll', 'allowed', 'sign_cross', { amt: '', to: shop });
+  }
+  // The MPC answer lands in on_signed a few blocks later.
+  for (let i = 0; i < 25 && cur.status !== 'signed'; i++) {
+    await new Promise(r => setTimeout(r, i ? 2000 : 1200));
+    cur = await W.viewFn(rpc, shop, 'get_order', { id: Number(order.id) }).catch(() => cur) || cur;
+    if (cur.status === 'failed' || cur.status === 'refunded') {
+      return { ...base, tx: signTx || passTx, reason: cur.status, needsSignature: false, signTx,
+        relay: { ok: false, text: `The signer did not finish this crossing (${cur.status}). The toll refunds the pass. Nothing moved on Base.` } };
+    }
+  }
+  if (cur.status !== 'signed' || cur.tx_nonce == null) {
+    return { ...base, tx: signTx || passTx, reason: 'signing', signTx,
+      relay: { ok: false, text: 'Signed on NEAR. The MPC signature is not on the toll yet. Press Pay on Base again in a minute to send it. No second pass is charged.' } };
+  }
+  const relay = await api('/api/toll/relay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: Number(cur.tx_nonce) }) })
+    .catch(e => ({ ok: false, text: `The relay did not answer (${String(e?.message || e).slice(0, 80)}). Press Pay on Base again to send it. No second pass is charged.` }));
+  return { ...base, tx: signTx || passTx, reason: 'ok', signTx, relay };
 }
 
 /**
@@ -1215,6 +1263,57 @@ export async function boardHoldIds(owner = S.me) {
     return null;
   } catch { return null; }
 }
+/**
+ * F62: one open hold, read from the board's `h` record (`encode_acts`, one hold) and the row's
+ * `s` record (epoch, confirm key). The board has no view for either. `confirmable` is exactly
+ * the check `confirm_hold` makes: the row has a confirm key, the hold was signed under that
+ * key, and the epoch has not moved. Null when the chain did not answer.
+ */
+export async function boardHoldInfo(holdId, owner = S.me) {
+  if (!S.board || !owner || holdId == null) return null;
+  try {
+    const [hb, sb] = await Promise.all([boardRecord('h', owner + '/' + holdId), boardRecord('s', owner)]);
+    if (!hb.length) return { open: false };
+    const rd = (raw) => {
+      const dv = new DataView(raw.buffer, raw.byteOffset, raw.length);
+      let i = raw.length >= 4 && dv.getUint32(0, true) === raw.length - 4 ? 4 : 0;
+      const t = {
+        u8: () => raw[i++], u32: () => { const v = dv.getUint32(i, true); i += 4; return v; },
+        u64: () => { const v = dv.getBigUint64(i, true); i += 8; return v; },
+        u128: () => { const lo = dv.getBigUint64(i, true), hi = dv.getBigUint64(i + 8, true); i += 16; return (hi << 64n) + lo; },
+        bytes: (n) => { const b = raw.subarray(i, i + n); i += n; return b; },
+      };
+      t.str = () => new TextDecoder().decode(t.bytes(t.u32()));
+      return t;
+    };
+    const h = rd(hb);
+    // encode_acts: the effect budgets section first (empty here), then the holds.
+    for (let o = h.u32(); o > 0; o--) { h.str(); for (let m = h.u32(); m > 0; m--) { h.str(); h.str(); h.str(); h.u128(); h.u128(); h.u128(); h.u128(); } }
+    h.u32(); h.str(); h.u64();
+    const receiver = h.str(), method = h.str();
+    const args = h.str();
+    const amount = h.u128(); h.u64();
+    for (let n = h.u32(); n > 0; n--) { h.str(); h.str(); h.str(); h.u128(); h.u128(); }
+    const expires = h.u64(); const pending = h.u8() === 1; const epoch = h.u64();
+    const holdKey = Array.from(h.bytes(32)).map(b => b.toString(16).padStart(2, '0')).join('');
+    let rowEpoch = 0n, rowKey = '';
+    if (sb.length) {
+      const r = rd(sb);
+      rowEpoch = r.u64();
+      if (r.u8() === 1) rowKey = Array.from(r.bytes(32)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    let a = {}; try { a = JSON.parse(args); } catch { /* not a guard pay */ }
+    const zero = /^0+$/.test(holdKey);
+    const expiresMs = Number(expires / 1_000_000n);
+    const stuck = !pending ? 'sent' : (!rowKey || zero) ? 'no confirm key' : rowKey !== holdKey ? 'confirm key changed'
+      : (rowEpoch || 0n) !== epoch ? 'rules changed since' : Date.now() > expiresMs ? 'expired' : '';
+    return {
+      stuck,
+      open: true, pending, receiver, method, payee: a.payee || '', amountYocto: String(a.amount || amount),
+      expiresMs, rowHasKey: !!rowKey, holdKeyZero: zero, confirmable: !stuck,
+    };
+  } catch { return null; }
+}
 /** One board side record (`<prefix>` + borsh(owner)), raw bytes. Null when unread, empty when absent. */
 async function boardRecord(prefix, owner) {
   const enc = new TextEncoder().encode(owner);
@@ -1383,6 +1482,28 @@ function confirmKeyNow() {
 /** The visitor's own button releases a WARN. The confirm key must be in this browser. */
 export async function guardConfirm({ holdId, confirmKey } = {}) {  const guard = guardAccount();
   if (!guard) return { ok: false, signed: false, tx: null, why: 'The guard contract is not in the deployment record. Nothing was signed.' };
+  // F62 (film 2026-11-12): a row set up with Google/Privy never registered a confirm key, so
+  // its holds carry the empty key and `confirm_hold` can never release them. Say that, and
+  // give this row a confirm key now (one wallet approval; the storage deposit's unused part is refunded), so the next hold can be
+  // released from this button. The hold itself is only refundable.
+  const info = await boardHoldInfo(holdId).catch(() => null);
+  if (info && info.open && !info.confirmable && !confirmKey) {
+    const amt = fmt(info.amountYocto);
+    let added = '';
+    if (!info.rowHasKey) {
+      try {
+        const k = W.keyFrom();
+        const h = await sign(S.board, [fc('set_confirm_key', { key: W.pubkeyHex(k) }, 30, String(5n * 10n ** 21n))]);
+        localStorage.setItem('nearcarta.vault.confirm.' + S.me, k.secretKey);
+        keep(h, 'guard', 'allowed', 'set_confirm_key', { amt: '', to: S.board });
+        added = ' Your row now has a confirm key in this browser, so the next held payment can be confirmed here.';
+      } catch (e) {
+        added = userCancelled(e) ? ' The confirm key was not added: the wallet was closed.' : ` The confirm key was not added: ${String(e?.message || e).slice(0, 100)}.`;
+      }
+    }
+    const because = info.stuck === 'expired' ? 'its confirm window has ended' : info.stuck === 'no confirm key' ? 'it was signed while your row had no confirm key' : `the ${info.stuck}`;
+    return { ok: false, signed: false, tx: null, why: `Hold #${holdId} (${amt} to ${info.payee || info.receiver}) can no longer be confirmed: ${because}. Press Cancel to return it to your row. Nothing was sent.${added}` };
+  }
   const row = await guardRowNow();
   const prev = globalThis.__guardConfirmKey;
   if (confirmKey) globalThis.__guardConfirmKey = confirmKey;
