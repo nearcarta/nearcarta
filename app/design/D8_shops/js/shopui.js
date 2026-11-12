@@ -766,7 +766,7 @@ async function tollPay(quote) {
     if (o.tx) extra.passTx = o.tx;
     const paid = !!o.relay?.ok || o.relay?.claim === 'paid';
     if (paid) { sh?.hideRefuse?.(); if (sh?.act && runScene) runScene(sh.act({ success: true })); }
-    return { ok: paid, o, tx: o.tx, hint, success: paid, crossing: true, needsSignature: !!o.needsSignature, keep: true, kind: paid ? 'ok' : 'no', say: hint, rc: o.tx ? A.txLine(o.tx) : '' };
+    return { ok: paid, o, tx: o.tx, hint, success: paid, crossing: true, baseTx: o.relay?.explorer || '', needsSignature: !!o.needsSignature, keep: true, kind: paid ? 'ok' : 'no', say: hint, rc: o.tx ? A.txLine(o.tx) : '' };
   }
   if (!o || o.decision !== 'allowed' || !o.tx) {
     const hint = tollRefusal(A.why(o?.reason)) || 'The charter did not allow this pass. Nothing moved on Base.';
@@ -879,6 +879,9 @@ const APPS = {
         row: () => A.S.boardRow || null,
         account: () => A.S.me || '',
         passes: () => tollPassRows(),
+        // F61c: this row's crossings on the toll, and its own derived Base address.
+        orders: () => A.rowOrders(A.tollAcct(), A.S.me),
+        rowAddress: () => A.tollRowAddress(),
         onPay: (quote) => tollPay(quote),
         onBroadcast: () => fetch(((globalThis.NEARCARTA_API || '').replace(/\/$/, '')) + netCfg().apiPath + '/toll/broadcast', { method: 'POST' }).then(r => r.json()).catch(() => ({ ok: false, text: 'The broadcast did not answer. Nothing moved on Base.' })),
         onBasePaid: () => { if (sh?.act && runScene) runScene(sh.act({ basePaid: true })); },

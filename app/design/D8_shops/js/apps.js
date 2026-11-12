@@ -16,6 +16,7 @@ import { createGuardLedger, guardSend } from '/panels/guard-live.js';
 import { proposalMessage, refusalOf, REFUSALS } from './board.js';
 import { rulesPlan } from '../../../../shared/hall/plan.js';
 import { missingCross } from '/foreign-path.js';
+import { addressFromKey } from '/toll-derive.js';
 import { callAsMessage, crossArgs, unitsOf, setSha256Hex } from '/board-call-as.js';
 // `/board-call-as.js` is served as-is, so it cannot import a package. The wallet
 // bundle already carries sha256; hand it over before any signed text is built.
@@ -65,9 +66,11 @@ const WHY = {
   over_daily_action_count: 'too many payments today (your rules cap the count; it resets at midnight UTC)', below_min_amount: 'smaller than your smallest payment', outside_time_window: 'outside the hours you allowed',
   unknown_clause: 'you never allowed that route', stale_policy_version: 'your rules changed mid-ask', expired: 'the request expired', storage_reserve_low: 'your charter needs a top-up', frozen: 'your charter is frozen', batch_refused: 'another payout broke a rule',
 };
-export const why = r => WHY[r] || r || '';
+export const why = r => WHY[r] || (/ERR_[A-Z]|panicked/.test(String(r || '')) ? plainError(r) : r) || '';
 // Contract panics, in plain words: no "Smart contract panicked", no ERR_ codes.
 const PLAIN = [
+  // F61c: the crossings that ran before set_effects was written from the Toll (F37).
+  [/ERR_EFFECT/, 'this row had no Base budget for that address yet, so the board refused before anything was paid (the Toll now writes the budget first)'],
   [/not a charter from the gate's factor/, 'the Toll gate does not accept this charter (it is not from a charter factory the gate lists)'],
   [/already opened the gate/, 'this toll payment already opened the gate once; pay the toll again for a new crossing'],
   [/has not paid|action not confirmed/, 'your toll payment has not settled yet; wait a few seconds and try again'],
@@ -664,6 +667,23 @@ export async function toll(quote) {
  * walk stops at the first missing id. A read that errors is retried, never taken as "none".
  */
 export const tollAcct = () => TS.TOLL_ACCT;
+/**
+ * F61c: this row's own Base address, derived now from the MPC key for the toll and the path
+ * `row:<owner>:base`, without waiting for a first signature. Balance read from Base, or null.
+ */
+export async function tollRowAddress(owner = S.me) {
+  if (!owner) return null;
+  const path = `row:${owner}:base`;
+  const pk = await view('v1.signer', 'derived_public_key', { path, predecessor: TS.TOLL_ACCT, domain_id: 0 });
+  const { address, bytes } = addressFromKey(String(pk || ''));
+  if (bytes !== 64) return null;
+  let balanceWei = null;
+  try {
+    const r = await fetch('https://mainnet.base.org', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getBalance', params: [address, 'latest'] }) }).then(x => x.json());
+    if (r?.result) balanceWei = BigInt(r.result).toString();
+  } catch { /* the address still shows */ }
+  return { path, address, balanceWei };
+}
 export async function rowOrders(shop, owner) {
   const out = [];
   for (let id = 0; id < 64; id++) {
