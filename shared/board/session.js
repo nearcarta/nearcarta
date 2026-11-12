@@ -201,10 +201,24 @@ export const MAX_CALLS = 24;
 // Each pair is the receiver, the method and a 16-byte cap: `receiver.length + method.length
 // + 24`. The list almost always carries the wrap.near trio, the board stamp and the House
 // shop's two calls, and those count too.
-export const ROW_FIXED_BYTES = 1490;
+// Those 1490 bytes were measured with the old 600-byte side reserve. The live board
+// (code 51kKGvtV…, MAX_ROW_YOCTO 0.04 NEAR = 4000 bytes) prepays SIDE_RESERVE_BYTES = 1400 on
+// `set_calls`, i.e. 800 more, so a fresh row's fixed cost is 1490 + 800 = 2290 bytes.
+// Cross-check on chain 2026-11-12: row 8ccd5d33 with eight receivers locks 3469 bytes.
+export const ROW_SIDE_RESERVE_EXTRA_BYTES = 800;
+export const ROW_FIXED_BYTES = 1490 + ROW_SIDE_RESERVE_EXTRA_BYTES;
+/**
+ * Cushion kept free on a fresh row for the 32-byte margin each later edit adds and for a
+ * hold larger than the prepaid reserve. A fresh row is budgeted pessimistically on purpose.
+ */
+export const ROW_EDIT_CUSHION_BYTES = 200;
 export const ROW_BYTES_PER_RECEIVER = 24;
-/** The whole row's storage allowance, from contracts/charter_board MAX_ROW_YOCTO. */
-export const ROW_STORAGE_BYTES = 2000; // conservative: the hold build allows 3000 with a 1400-byte reserve (+200 B of pair room); kept at the measured 2000/600 budget
+/**
+ * The whole row's storage allowance: contracts/charter_board MAX_ROW_YOCTO (0.04 NEAR on the
+ * live board, `get_config().max_row_yocto`) at 1e19 yocto per byte = 4000 bytes. The old 2000
+ * left Town Hall (7 pairs) and any plain Payouts payee unable to fit any row.
+ */
+export const ROW_STORAGE_BYTES = 4000;
 
 /**
  * Bytes the FIRST effect budget costs a row. Measured on mainnet 2026-11-07 by writing the
@@ -253,14 +267,16 @@ export const FOUR_SHOP_MAX_PAIRS = 5;
 export function rowHeadroomBytes(row, maxRowBytes = ROW_STORAGE_BYTES) {
   const locked = row?.storage_locked;
   if (locked == null || locked === '') return null;
-  const lockedBytes = Number(locked) / 1e19; // storage costs 1e19 yocto per byte on mainnet
-  if (!Number.isFinite(lockedBytes)) return null;
+  // Storage costs 1e19 yocto per byte. BigInt, because Number(3.794e22) / 1e19 is 3793.9999…
+  // and the floor then reports one byte less than the chain has.
+  let lockedBytes;
+  try { lockedBytes = Number((BigInt(locked) + 10n ** 19n - 1n) / 10n ** 19n); } catch { return null; }
   return Math.max(0, Math.floor(maxRowBytes - lockedBytes));
 }
 /** Room for the pair list when the rules name `receivers` receivers. */
 export function pairBudgetBytes(receivers = 1) {
   const n = Math.max(1, Number(receivers) || 1);
-  return Math.max(0, ROW_STORAGE_BYTES - ROW_FIXED_BYTES - ROW_BYTES_PER_RECEIVER * n);
+  return Math.max(0, ROW_STORAGE_BYTES - ROW_FIXED_BYTES - ROW_EDIT_CUSHION_BYTES - ROW_BYTES_PER_RECEIVER * n);
 }
 /** Kept for callers that ask for the widest budget a one-receiver row allows. */
 export const MAX_PAIR_BYTES = pairBudgetBytes(1);

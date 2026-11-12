@@ -189,7 +189,7 @@ export function plainRulesError(error, { rulesSaved = false } = {}) {
   const t = String(error?.message || error || '');
   let why = '';
   if (/ERR_RECEIVERS/.test(t)) why = 'set_calls was refused: the shop list repeats an account and a method, or it names more than 24.';
-  else if (/ERR_ROW_TOO_BIG/.test(t)) why = 'set_calls was refused: this shop list does not fit a row that holds 0.02 NEAR. Remove a shop or use a shorter account id.';
+  else if (/ERR_ROW_TOO_BIG/.test(t)) why = 'set_calls was refused: this shop list does not fit a row that holds 0.04 NEAR. Remove a shop or use a shorter account id.';
   else if (/ERR_DEPOSIT/.test(t)) why = 'set_calls was refused: the deposit did not cover the storage this list writes. Reload the page and try again.';
   if (!why) return t.replace(/^Smart contract panicked:\s*/i, '');
   return rulesSaved ? `set_rules was saved. ${why}` : why;

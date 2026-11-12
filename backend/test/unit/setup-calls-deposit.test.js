@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { CALLS_DEPOSIT_YOCTO, EFFECT_BUDGET_FIRST_BYTES, EFFECT_BUDGET_MORE_BYTES, FOUR_SHOP_MAX_PAIRS, MAX_PAIR_BYTES, ROW_BYTES_PER_RECEIVER, ROW_FIXED_BYTES, ROW_STORAGE_BYTES, callPairBytes, callPolicy, callsFitRow, dropOptionalPairs, pairBudgetBytes, stampCalls } from '../../../shared/board/session.js';
+import { FERRY_CALL_TARGETS, payoutsCalls, CALLS_DEPOSIT_YOCTO, EFFECT_BUDGET_FIRST_BYTES, EFFECT_BUDGET_MORE_BYTES, FOUR_SHOP_MAX_PAIRS, MAX_PAIR_BYTES, ROW_BYTES_PER_RECEIVER, ROW_FIXED_BYTES, ROW_STORAGE_BYTES, callPairBytes, callPolicy, callsFitRow, dropOptionalPairs, pairBudgetBytes, stampCalls } from '../../../shared/board/session.js';
 import { HOUSE_CALLS } from '../../../shared/house/shop.js';
 import { plainRulesError } from '../../../shared/setup/rules-diff.js';
 
@@ -40,35 +40,35 @@ test('callsFitRow matches the row capacity measured on mainnet', () => {
   // receiver, fixed 1490. Two four-receiver shapes were refused on the same row (ERR_ROW_TOO_BIG
   // at 8 and 9 pairs) and the 7-pair shape landed at 1993, so the boundary is exercised on chain,
   // not just in a model.
-  assert.equal(ROW_FIXED_BYTES, 1490);
+  // Those points were taken with the old 600-byte side reserve. The live board prepays 1400,
+  // so its fixed cost is 800 bytes more, and its row cap is 0.04 NEAR = 4000 bytes.
+  assert.equal(ROW_FIXED_BYTES, 1490 + 800);
   assert.equal(ROW_BYTES_PER_RECEIVER, 24);
-  assert.equal(pairBudgetBytes(1), 2000 - 1490 - 24);
-  assert.equal(pairBudgetBytes(4), 2000 - 1490 - 24 * 4);
-  // The three live points must reproduce exactly from the constants.
+  assert.equal(ROW_STORAGE_BYTES, 4000);
+  assert.equal(pairBudgetBytes(1), 4000 - 2290 - 200 - 24);
+  assert.equal(pairBudgetBytes(4), 4000 - 2290 - 200 - 24 * 4);
+  // The three old live points still reproduce from the old fixed cost.
   for (const [receivers, locked] of [[1, 1916], [2, 1940], [3, 1964]]) {
-    assert.equal(ROW_FIXED_BYTES + ROW_BYTES_PER_RECEIVER * receivers + 402, locked, `${receivers} receivers`);
+    assert.equal(1490 + ROW_BYTES_PER_RECEIVER * receivers + 402, locked, `${receivers} receivers`);
   }
+  // The live board, measured 2026-11-12: row 8ccd5d33 was opened in one tx (2YyLuwtn…) with
+  // eight receivers and a 989-byte call list, and get_charter reports 3469 bytes locked. The
+  // model says 2290 + 24*8 + 989 = 3471, two bytes pessimistic.
+  assert.equal(ROW_FIXED_BYTES + ROW_BYTES_PER_RECEIVER * 8 + 989, 3471);
+  assert.ok(3471 >= 3469 && 3471 - 3469 < 32);
 });
 
 test('a row with more receivers holds fewer pairs, which mainnet proved', () => {
-  // The same live row, one fixed list and only the receiver count moving, held eight pairs
-  // next to one, two and three receivers (1916 / 1940 / 1964 bytes locked) and refused them
-  // next to four. Two four-receiver shapes were refused on chain: 8 pairs at 424 pair bytes
-  // and 9 pairs at 472. The 7-pair shape at 375 bytes landed with 1993 locked.
-  //
-  // The assertions below are the byte totals, because reconstructing an 8-pair list from
-  // account ids is how an earlier version of this test drifted 11 bytes off the chain.
-  const pairBudget = pairBudgetBytes(4);
-  assert.equal(pairBudget, 2000 - 1490 - 24 * 4);
-  assert.ok(368 <= pairBudget, 'the 7-pair list that landed is inside the budget');
-  assert.ok(424 > pairBudget, 'the 8-pair list the chain refused (424 bytes) is outside it');
-  assert.ok(472 > pairBudget, 'the 9-pair list the chain refused (472 bytes) is outside it');
-  // Eight pairs fit next to three receivers and not next to four: the live boundary.
-  assert.ok(424 <= pairBudgetBytes(3), 'three receivers still hold the 424-byte list');
-  assert.ok(424 > pairBudgetBytes(4), 'four receivers do not');
-  // The budget shrinks by 24 bytes per extra receiver.
+  // On the old 2000-byte board the same live row held eight pairs next to three receivers and
+  // refused them next to four (424 and 472 pair bytes refused, 375 landed). The arithmetic of
+  // that board is kept here so the slope stays pinned.
+  const oldBudget = n => 2000 - 1490 - 24 * n;
+  assert.ok(368 <= oldBudget(4) && 424 > oldBudget(4) && 424 <= oldBudget(3));
+  // The live 4000-byte board keeps the same slope: 24 bytes per extra receiver.
   assert.equal(pairBudgetBytes(1) - pairBudgetBytes(2), 24);
-  assert.equal(pairBudgetBytes(6), 2000 - 1490 - 24 * 6);
+  assert.equal(pairBudgetBytes(6), 4000 - 2290 - 200 - 24 * 6);
+  // and the 989-byte list the live row holds beside eight receivers is inside the budget.
+  assert.ok(989 <= pairBudgetBytes(8));
 });
 
 test('the pair byte count is the same number the sandbox test computes', () => {
@@ -91,27 +91,27 @@ test('the pair byte count is the same number the sandbox test computes', () => {
 test('the default /setup list always fits a row', () => {
   assert.equal(callsFitRow(policy(['toll.nearcarta.near'])), true);
   assert.equal(callsFitRow(policy(['wrap.near'])), true);
-  // 24 short pairs is well inside MAX_CALLS but far outside one row's storage.
-  const short = Array.from({ length: 24 }, (_, i) => ({ receiver: `s${i}.near`, method: 'm' }));
-  assert.equal(short.length, 24);
-  assert.equal(callsFitRow(short), false);
+  // 24 pairs with long ids is inside MAX_CALLS but outside one row's storage.
+  const long = Array.from({ length: 24 }, (_, i) => ({ receiver: `s${i}${'x'.repeat(40)}.near`, method: 'ft_transfer' }));
+  assert.equal(long.length, 24);
+  assert.equal(callsFitRow(long), false);
 });
 
 test('callPairBytes counts the receiver, the method and the 16-byte cap', () => {
   assert.equal(callPairBytes('toll.nearcarta.near', 'ft_transfer'), 19 + 11 + 24);
   assert.equal(callPairBytes('wrap.near', 'near_deposit'), 9 + 12 + 24);
-  // The budget is the pairs a row may hold, next to MAX_ROW_YOCTO = 2000 bytes.
+  // The budget is the pairs a row may hold, next to MAX_ROW_YOCTO = 4000 bytes.
   // MAX_PAIR_BYTES is the one-receiver case; a row with more receivers has less.
   assert.equal(MAX_PAIR_BYTES, pairBudgetBytes(1));
-  assert.equal(MAX_PAIR_BYTES, 486);
-  assert.ok(MAX_PAIR_BYTES < 2000);
+  assert.equal(MAX_PAIR_BYTES, 1486);
+  assert.ok(MAX_PAIR_BYTES < 4000);
 });
 
 test('a refused set_calls says which refusal it was', () => {
   const plain = plainRulesError(new Error('Smart contract panicked: ERR_DEPOSIT'));
   assert.match(plain, /deposit did not cover the storage/);
   const big = plainRulesError(new Error('Smart contract panicked: ERR_ROW_TOO_BIG'));
-  assert.match(big, /does not fit a row that holds 0\.02 NEAR/);
+  assert.match(big, /does not fit a row that holds 0\.04 NEAR/);
   const partial = plainRulesError(new Error('Smart contract panicked: ERR_ROW_TOO_BIG'), { rulesSaved: true });
   assert.match(partial, /^set_rules was saved\./);
 });
@@ -130,90 +130,59 @@ test('the page refuses an over-full list before the wallet opens, on both paths'
   assert.match(update, /Update my rules would be refused on chain/);
 });
 
-test('the optional pairs go before a shop does, and the real limit is four shops', () => {
-  // A four-shop row was refused on mainnet with the full list and landed once two optional
-  // pairs were dropped. Dropping a shop would break something the visitor just asked for, so
-  // the optional pairs go first, and each one states what it costs.
+test('the optional pairs go before a shop does, and Plan A (root + Toll + Guard + House + Hall) fits', () => {
+  // On the old 2000-byte board Town Hall's seven lifecycle pairs never fit beside three other
+  // contract shops, so /setup could not open a row reaching the Hall or a plain Payouts payee.
+  // The live board caps a row at 4000 bytes, so the film's Plan A list fits whole.
   const pairBytes = calls => calls.reduce((n, c) => n + callPairBytes(c.receiver, c.method), 0);
   const houseIf = recv => (recv.includes('house.nearcarta.near') ? HOUSE_CALLS : []);
   const build = shops => dropOptionalPairs(
-    callPolicy(shops, CAP, DAILY, 'ft_transfer', [...stampCalls(BOARD, CAP), ...houseIf(shops)]).calls,
+    callPolicy(shops, CAP, DAILY, 'ft_transfer', payoutsCalls([...FERRY_CALL_TARGETS, ...stampCalls(BOARD, CAP), ...houseIf(shops)], CAP).calls).calls,
     shops.length,
   );
   const TOLL = 'toll.nearcarta.near', GUARD = 'guard.nearcarta.near', ARENA = 'arena.nearcarta.near';
-  const HOUSE = 'house.nearcarta.near', HALL = 'townhall.nearcarta.near';
+  const HOUSE = 'house.nearcarta.near', HALL = 'townhall.nearcarta.near', ROOT = 'nearcarta.near';
+  const reach = { [ROOT]: 'ft_transfer', [TOLL]: 'cross', [GUARD]: 'pay', [ARENA]: 'fund', [HOUSE]: 'house_session_check_in', [HALL]: 'post_job' };
 
-  // Every four-shop combination the city offers fits, EXCEPT one that names the Town Hall
-  // beside three contracts that each need their own calls. That is a real limit measured on
-  // mainnet 2026-11-08, not a page rule: Hall v2 is reached on seven lifecycle methods
-  // (`post_job`, `bid`, `counter`, `accept`, `deliver`, `review`, `refund`), and seven Hall
-  // pairs beside Toll's `cross`, Guard's `pay` and House's two session calls come to 692 pair
-  // bytes against the 414 a four-receiver row allows. A Hall-only row locks 1858 bytes and
-  // fits fine; it is the combination that does not. The page must refuse and say so.
-  // Arena's real method is `fund` (adding to a guardian's pot). It is not `ft_transfer`: the
-  // deployed arena has no such method, which is why pressing Feed was refused on chain.
-  const reach = { [TOLL]: 'cross', [GUARD]: 'pay', [ARENA]: 'fund', [HOUSE]: 'house_session_check_in', [HALL]: 'post_job' };
-  // Hall's seven lifecycle methods do not share a 0.02 NEAR row with any other shop that
-  // needs calls of its own. Measured above: 692 pair bytes against 414 for Hall+House+Toll,
-  // and 693 for Hall+House+Arena. That is the contract's row cap, not a page preference, so
-  // the page must refuse the shape instead of signing a list the chain rejects.
-  assert.equal(build([TOLL, GUARD, HOUSE, HALL]).fits, false, 'Hall with three contract shops does not fit one row');
-  assert.equal(build([TOLL, ARENA, HOUSE, HALL]).fits, false, 'Hall with House and two more shops does not fit one row');
-  for (const shops of [[TOLL, GUARD, ARENA, HOUSE]]) {
-    const t = build(shops);
-    assert.equal(t.fits, true, `${shops.length} shops fit: ${shops.join(',')}`);
-    for (const shop of shops) {
-      assert.ok(t.calls.some(c => c.receiver === shop && c.method === reach[shop]), `${shop} is still reachable on ${reach[shop]}`);
-    }
-    // What was dropped is only ever an optional pair, and each says its cost.
-    for (const d of t.dropped) assert.ok(d.why && d.why.length > 10, `${d.method} states why it was droppable`);
+  const planA = [ROOT, TOLL, GUARD, HOUSE, HALL];
+  const a = build(planA);
+  assert.equal(a.fits, true, 'Plan A fits one row');
+  assert.deepEqual(a.dropped, [], 'nothing optional had to go');
+  assert.equal(pairBytes(a.calls), 941);
+  assert.equal(pairBudgetBytes(5), 1390);
+  // Fixed + receivers + pairs = 3351 bytes, well under the 4000-byte cap.
+  assert.ok(ROW_FIXED_BYTES + 24 * 5 + pairBytes(a.calls) < ROW_STORAGE_BYTES);
+  for (const shop of planA) {
+    assert.ok(a.calls.some(c => c.receiver === shop && c.method === reach[shop]), `${shop} is reachable on ${reach[shop]}`);
   }
-
-  // Five shops do NOT fit, and that is a contract limit rather than a page rule. The exact
-  // count is now 740 pair bytes against a 390-byte budget, because the Town Hall contributes
-  // its seven lifecycle methods (it used to contribute one `ft_transfer` while the account ran
-  // the legacy bounty code and had no `post_job` at all). The page must say so and refuse to
-  // sign, because the chain answers ERR_ROW_TOO_BIG after the wallet has already approved.
-  const five = build([TOLL, GUARD, ARENA, HOUSE, HALL]);
-  assert.equal(five.fits, false, 'five named shops do not fit one 0.02 NEAR row');
-  assert.equal(pairBytes(five.calls), 740);
-  assert.equal(pairBudgetBytes(5), 390);
-  assert.ok(pairBytes(five.calls) > pairBudgetBytes(5));
-
-  // The exact shape that landed on mainnet (375 bytes with arena on ft_transfer). Arena's pair
-  // is now its real method `fund`, which is 7 bytes shorter, so the same seven-pair list is 368.
-  const landed = build([TOLL, GUARD, ARENA, HOUSE]);
-  assert.equal(landed.calls.length, 7);
-  assert.equal(pairBytes(landed.calls), 368);
-  assert.deepEqual(landed.dropped.map(d => d.method), ['storage_deposit', 'stamp']);
+  for (const shops of [[TOLL, GUARD, HOUSE, HALL], [TOLL, ARENA, HOUSE, HALL], [TOLL, GUARD, ARENA, HOUSE, HALL]]) {
+    const t = build(shops);
+    assert.equal(t.fits, true, shops.join(','));
+    for (const shop of shops) assert.ok(t.calls.some(c => c.receiver === shop && c.method === reach[shop]), `${shop} reachable`);
+  }
+  // Even eight receivers (the contract's MAX_RECEIVERS) with long payee ids fit now.
+  const payees = Array.from({ length: 3 }, (_, i) => `payee${i}${'x'.repeat(50)}.near`);
+  assert.equal(build([TOLL, GUARD, HOUSE, HALL, ROOT, ...payees]).fits, true);
+  // A list that does not fit has its optional pairs dropped first, each with a reason.
+  const tight = dropOptionalPairs([...a.calls, ...Array.from({ length: 4 }, (_, i) => ({ receiver: `p${i}${'x'.repeat(60)}.near`, method: 'ft_transfer' }))], 8);
+  assert.ok(tight.dropped.length > 0);
+  for (const d of tight.dropped) assert.ok(d.why && d.why.length > 10, `${d.method} states why it was droppable`);
   // The wrap legs a swap needs are never dropped.
-  assert.ok(landed.calls.some(c => c.receiver === 'wrap.near' && c.method === 'near_deposit'));
-  assert.ok(landed.calls.some(c => c.receiver === 'wrap.near' && c.method === 'ft_transfer'));
+  assert.ok(tight.calls.some(c => c.receiver === 'wrap.near' && c.method === 'near_deposit'));
+  assert.ok(tight.calls.some(c => c.receiver === 'wrap.near' && c.method === 'ft_transfer'));
 });
 
-test('a shop-bearing row cannot hold a foreign effect budget, which is a contract limit', () => {
-  // The four-shop ceiling, measured by growing the list against a four-receiver row:
-  //   4 receivers, 4 pairs -> 1762 locked; 5 pairs -> 2000 (full); 6 pairs -> ERR_ROW_TOO_BIG.
+test('effect budgets: the old 2000-byte row had no room, the live reserve pays them', () => {
+  // Old board, measured 2026-11-07: a four-shop row was full at five pairs (1762 + 238 = 2000).
   assert.equal(FOUR_SHOP_MAX_PAIRS, 5);
-  assert.ok(1762 + 238 <= 2000, 'the fifth pair still fits');
-  assert.ok(1762 + 285 > 2000, 'the sixth does not');
-  // Measured on mainnet 2026-11-07 against one row, one cap at a time:
-  //   toll-only (1 pair)     1594 locked
-  //   + base/usdc cap        1945  (+351, creates the ACTS record)
-  //   + base/native cap      1979  (+34, record already there)
   assert.equal(EFFECT_BUDGET_FIRST_BYTES, 351);
   assert.equal(EFFECT_BUDGET_MORE_BYTES, 34);
   assert.equal(1945 - 1594, EFFECT_BUDGET_FIRST_BYTES);
   assert.equal(1979 - 1945, EFFECT_BUDGET_MORE_BYTES);
-  // Every row shape that carries a shop is too full to accept even the first cap.
   for (const [name, locked] of [['four shops', 1993], ['three shops', 1914], ['two pairs', 1683]]) {
-    assert.ok(ROW_STORAGE_BYTES - locked < EFFECT_BUDGET_FIRST_BYTES, `${name} has no room for an effect budget`);
+    assert.ok(2000 - locked < EFFECT_BUDGET_FIRST_BYTES, `${name} had no room on the old board`);
   }
-  // After the first cap the bare row has 55 bytes left, so exactly one more cap fits and the
-  // row is then full: 1979 locked, 21 free, and 34 needed for a third. That is why the toll CTA
-  // could not complete even with two caps reserved (`ERR_DEPOSIT` on the in-flight hold).
-  assert.equal(2000 - 1945, 55);
-  assert.ok(2000 - 1945 >= EFFECT_BUDGET_MORE_BYTES, 'a second cap still fits');
-  assert.equal(2000 - 1979, 21);
-  assert.ok(2000 - 1979 < EFFECT_BUDGET_MORE_BYTES, 'a third cap does not, and the hold has nothing left');
+  // Live board: the 1400-byte side reserve is prepaid by set_calls, so a first effect budget and
+  // a second cap come out of the reserve, and the cushion is still left on a fresh row.
+  assert.ok(EFFECT_BUDGET_FIRST_BYTES + EFFECT_BUDGET_MORE_BYTES < 1400);
 });
