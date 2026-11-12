@@ -418,6 +418,7 @@ function wireRules() {
 
 // ---------- 6. Sign ----------
 let signLog = [];
+const RULES_ROW_RETRY_MS = 10000;
 let chainRow = null, chainLoadedFor = '', chainError = '', chainRead = false, readError = false;
 // True when this browser holds the agent key for the account's row. It does not mean
 // the row exists: a closed row leaves the key behind, and board v2 returns `null` from
@@ -1329,7 +1330,17 @@ function wireTry() {
 }
 
 const VIEWS = { signin: [sSignin, wireSignin], fund: [sFund, wireFund], privacy: [sPrivacy, wirePrivacy], character: [sCharacter, wireCharacter], rules: [sRules, wireRules], sign: [sSign, wireSign], try: [sTry, wireTry] };
+// A paint loop guard. No real flow paints the wizard more than a few times a second; a loop
+// that does freezes the tab (see kickRulesRowRead). Past the limit, skip paints until the
+// next second instead of hanging the renderer.
+const RENDER_BURST = 40;
+let renderWindow = 0, renderCount = 0;
+function renderBurst(now = Date.now()) {
+  if (now - renderWindow > 1000) { renderWindow = now; renderCount = 0; }
+  return ++renderCount > RENDER_BURST;
+}
 function render() {
+  if (renderBurst()) { if (renderCount === RENDER_BURST + 1) console.warn('setup: paint loop stopped'); return; }
   if (!PREVIEW && !me && st.step > 0) st.step = 0;
   // Board v2 returns `null` from `get_charter` for an account with no row, and a stored
   // agent key can outlive a closed row. The sign step is where a row is opened, so it
@@ -1345,9 +1356,25 @@ function render() {
   // The rules step now needs the chain row too: it refuses a new shop on a row whose 0.02
   // NEAR of storage is already used, which only the chain can tell us. Reading it here means
   // the guard has a row to look at instead of skipping itself.
-  if (STEPS[st.step][0] === 'rules' && boardLive() && !st.trial && !chainRow) {
-    ensureChainRow().then(() => { if (STEPS[st.step][0] === 'rules') render(); }).catch(() => {});
-  }
+  //
+  // Read it at most once per account, in the background, and never repaint from here. This
+  // used to be `ensureChainRow().then(render)` on every paint: for an account with no row
+  // `get_charter` answers null, ensureChainRow returns at once (already loaded), and render
+  // called itself again in a microtask loop that never yielded. The tab froze, typing was
+  // lost and memory climbed into gigabytes. The rules view does not show chainRow; only the
+  // Next guard reads it, at click time, so a repaint is not needed.
+  if (STEPS[st.step][0] === 'rules') kickRulesRowRead();
+}
+
+let rulesRowRead = null, rulesRowReadAt = 0;
+/** Starts one background row read for the rules guard. Returns true when a read started. */
+function kickRulesRowRead(now = Date.now()) {
+  if (!boardLive() || st.trial || !me || chainRow || chainLoadedFor === me || rulesRowRead) return false;
+  // A failed read clears chainLoadedFor so it can be retried; space retries out.
+  if (now - rulesRowReadAt < RULES_ROW_RETRY_MS) return false;
+  rulesRowReadAt = now;
+  rulesRowRead = ensureChainRow().catch(() => {}).finally(() => { rulesRowRead = null; });
+  return true;
 }
 
 function paintShell() {
