@@ -271,6 +271,20 @@ export async function buildCharter() {
  * account: after the deed exists, check-in, vault sends and heirs all go through the
  * session with no popup.
  */
+/**
+ * F28 (film 2026-11-12): a deed with no inheritance line cannot check in (house_session_check_in
+ * panics on a missing line), and a row may not set one through the board. The holder names heirs and
+ * guardians once with their own key: one wallet approval, 1 yocto, no other deposit.
+ */
+export const DAY_NS = 86_400n * 1_000_000_000n;
+export async function houseSetLine({ heirs = [], guardians = [], threshold = 1, periodNs = String(30n * DAY_NS), waitNs = String(7n * DAY_NS) } = {}) {
+  if (!S.me) throw new Error('Sign in first. Nothing was signed.');
+  const house = S.mainnet?.house?.contract || '';
+  if (!house) throw new Error('The house contract is not in the deployment record. Nothing was signed.');
+  const h = await sign(house, [fc('house_set_line', { token_id: S.me, heirs, guardians, threshold: Number(threshold) || 1, period_ns: String(periodNs), wait_ns: String(waitNs) }, 30, '1')]);
+  keep(h, 'house', 'allowed', 'heirs set');
+  return { ok: true, tx: h };
+}
 export async function houseMint({ capYocto = '50000000000000000000000', depositYocto = '20000000000000000000000' } = {}) {
   if (!S.me) throw new Error('Sign in first. Nothing was signed.');
   const house = houseAccount();
@@ -1193,14 +1207,14 @@ function guardDeps() {
     },
     send: async ({ method, args }) => {
       const ak = key ? await proposeAccessKey(key) : null;
-      if (!key || !ak) return { ok: false, tx: null, reason: 'no_session_key' };
+      if (!key || !ak) return { ok: false, tx: null, reason: 'no_session_key', why: 'The agent key in this browser is not on your account. Open /setup and renew the agent key. Nothing was signed.' };
       const names = ak.permission?.FunctionCall?.method_names || [];
       if (names.length && !names.includes(method)) {
-        return { ok: false, tx: null, reason: `key_cannot_${method}` };
+        return { ok: false, tx: null, reason: `key_cannot_${method}`, why: `This agent key cannot call ${method}. Renew it in /setup. Nothing was signed.` };
       }
       const gas = 170n * TG;
       const allowance = BigInt(ak.permission?.FunctionCall?.allowance || 0);
-      if (allowance && allowance < gas / TG * 10n ** 21n) return { ok: false, tx: null, reason: 'not_enough_allowance' };
+      if (allowance && allowance < gas / TG * 10n ** 21n) return { ok: false, tx: null, reason: 'not_enough_allowance', why: 'The agent key is low on gas. Refresh it in /setup. Nothing was signed.' };
       try {
         const signed = W.signTx({
           key, signerId: S.me, receiverId: S.board, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,

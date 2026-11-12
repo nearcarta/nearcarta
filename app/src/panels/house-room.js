@@ -81,6 +81,22 @@ function shell() {
   </div>`;
 }
 
+/** True only when the deed answered and has no inheritance line (a failed read is not proof). */
+export function lineMissing(line) {
+  return !!(line && typeof line === 'object' && line.live !== false && !line.line && !line.heirs && !line.why);
+}
+const ACCOUNT_RE = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
+/** The heirs form, checked the way house_set_line checks it, so a refusal never costs a wallet approval. */
+export function lineForm({ heir = '', guardian = '', owner = '' } = {}) {
+  const h = String(heir).trim().toLowerCase(), g = String(guardian).trim().toLowerCase();
+  const ok = (a) => a.length >= 2 && a.length <= 64 && ACCOUNT_RE.test(a);
+  if (!ok(h)) return { ok: false, why: 'Name one heir, a NEAR account such as friend.near. Nothing was signed.' };
+  if (!ok(g)) return { ok: false, why: 'Name one guardian, a NEAR account such as nearcarta.near. Nothing was signed.' };
+  if (h === g) return { ok: false, why: 'The heir and the guardian must be different accounts. Nothing was signed.' };
+  if (h === owner || g === owner) return { ok: false, why: 'You cannot be your own heir or guardian. Nothing was signed.' };
+  return { ok: true, heirs: [h], guardians: [g], threshold: 1 };
+}
+
 function nearText(y) {
   if (y == null || y === '') return '';
   try { return String(nearOf(y)); } catch { return ''; }
@@ -129,6 +145,7 @@ export function mountHouseRoom(root, hooks = {}) {
       else if (state.needsMint && state.tab === 'deed') cta.textContent = 'Mint my deed';
       else if (state.tab === 'vaults') cta.textContent = 'Send from house';
       else if (state.tab === 'heirs' && Number(state.line?.line?.pending_ns || 0) > 0) cta.textContent = 'Cancel release';
+      else if (lineMissing(state.line) && typeof hooks.setLine === 'function') cta.textContent = state.tab === 'heirs' ? 'Set my heirs' : 'Set heirs first';
       else cta.textContent = "I'm alive";
     }
     setStatus('');
@@ -253,6 +270,25 @@ export function mountHouseRoom(root, hooks = {}) {
       } finally { cta.disabled = false; }
       return;
     }
+    // F28: no inheritance line yet. A check-in would fail on chain, so the button leads to the one
+    // approval that fixes it, and "I'm alive" works through the row afterwards.
+    if (lineMissing(state.line) && typeof hooks.setLine === 'function') {
+      if (state.tab !== 'heirs') { showTab('heirs'); setStatus('Name one heir and one guardian, then press Set my heirs. One wallet approval, then I\'m alive checks in with no prompt.'); return; }
+      const form = lineForm({ heir: root.querySelector('#house-heir')?.value, guardian: root.querySelector('#house-guardians')?.value, owner: id });
+      if (!form.ok) { setStatus(form.why); return; }
+      cta.disabled = true;
+      setStatus('Approve the heirs in your wallet. 1 yocto, no other deposit.');
+      try {
+        const out = await hooks.setLine(form);
+        setStatus(`Heirs set · tx ${String(out?.tx || '').slice(0, 10)}… Reading the deed…`);
+        state.line = await fetch(api() + API_PATH + '/house/line/' + encodeURIComponent(id), { cache: 'no-store' }).then(r => r.json()).catch(() => state.line);
+        paintHeirs();
+        setStatus(`Heirs set · tx ${String(out?.tx || '').slice(0, 10)}… Now I'm alive checks in through your row.`);
+      } catch (e) {
+        setStatus(String(e?.message || 'The heirs were not set. Nothing was signed.').slice(0, 180));
+      } finally { cta.disabled = false; }
+      return;
+    }
     return turn(sentence());
   };
   showTab(state.tab);
@@ -291,10 +327,19 @@ export function mountHouseRoom(root, hooks = {}) {
     const line = state.line?.line;
     const set = (sel, val) => { const el = root.querySelector(sel); if (el) el.value = val; };
     if (!line) {
-      set('#house-check', state.line?.why || 'Inheritance is not on this live deed.');
-      set('#house-heir', 'Not set');
+      const missing = lineMissing(state.line) && typeof hooks.setLine === 'function';
+      set('#house-check', state.line?.why || (missing ? 'No heirs yet. Set them once, then I\'m alive checks in.' : 'Inheritance is not on this live deed.'));
+      for (const [sel, ph] of [['#house-heir', 'friend.near'], ['#house-guardians', 'nearcarta.near']]) {
+        const el = root.querySelector(sel);
+        if (!el) continue;
+        if (missing) { el.readOnly = false; if (el.value === 'Not set') el.value = ''; el.placeholder = ph; }
+        else el.value = 'Not set';
+      }
+      if (missing) { set('#house-threshold', '1'); set('#house-period', '30 days'); set('#house-wait', '7 days'); }
+      showTab(state.tab);
       return;
     }
+    for (const sel of ['#house-heir', '#house-guardians']) { const el = root.querySelector(sel); if (el) el.readOnly = true; }
     set('#house-check', line.last_check_in_ns ? `Last check-in ${line.last_check_in_ns}` : 'No check-in yet');
     set('#house-heir', (line.heirs || []).join(', ') || 'Not set');
     set('#house-guardians', (line.guardians || []).join(', ') || 'Not set');
