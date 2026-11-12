@@ -457,6 +457,33 @@ export async function runFerryAgent({ text, state = {}, charterReady = false, qu
   return { ok: true, loaded: true, mode: plan.mode, charter: stamp, hint };
 }
 
+
+/**
+ * A live Swap quote reveals Load cargo as a full-width button above Sign in, which is
+ * what made the tray scroll at 390 and show "more below" at 1440. Move that secondary
+ * action into the Sign in row so Review swap stays 48px gold and the story CTA still works.
+ */
+export function placeFerrySecondaryRow(root) {
+  const doc = root?.ownerDocument || (typeof document !== 'undefined' ? document : null);
+  const form = root?.id === 't-form' ? root : (root?.closest?.('#t-form') || doc?.getElementById?.('t-form') || null);
+  const tray = form?.closest?.('#tray') || doc?.querySelector?.('#shopUI #tray') || doc?.getElementById?.('tray') || null;
+  if (!tray) return { moved: false };
+  const row = Array.from(tray.children || []).find(el => el.classList?.contains?.('t-row')) || null;
+  if (!row) return { moved: false };
+  for (const stale of Array.from(row.children || []).filter(el => el.classList?.contains?.('ferry-cargo-actions'))) {
+    stale.remove();
+  }
+  const actions = form?.querySelector?.('.ferry-cargo-actions') || null;
+  if (!actions || actions.hidden || actions.hasAttribute?.('hidden')) {
+    row.classList.remove('ferry-secondary-row');
+    return { moved: false };
+  }
+  const act = Array.from(row.children || []).find(el => el.id === 't-act') || row.querySelector?.('#t-act') || null;
+  row.insertBefore(actions, act || null);
+  row.classList.add('ferry-secondary-row');
+  return { moved: true };
+}
+
 function mountFerry(root, hooks) {
   const routes = hooks.routes ? hooks.routes() : DEFAULT_ROUTES;
   const state = hooks.state || (hooks.state = {});
@@ -475,6 +502,7 @@ function mountFerry(root, hooks) {
     root.innerHTML = ferryMarkup(state, routes);
     bind();
     bindTokenFallbacks(root);
+    placeFerrySecondaryRow(root);
   };
   const paint = () => {
     if (hooks.repaint) hooks.repaint();

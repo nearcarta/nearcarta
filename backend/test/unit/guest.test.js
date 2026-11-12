@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { KeyPair } from 'near-api-js';
-import { guestName, guestAccount, publicKeyOk, refusedSecretField, start, status, guestCfg } from '../../src/guest.js';
+import { guestName, guestAccount, publicKeyOk, refusedSecretField, start, status, guestCfg, welcome } from '../../src/guest.js';
 import { dayCounter, globalCounter } from '../../src/guest-routes.js';
 
 const pk = () => KeyPair.fromRandom('ed25519').getPublicKey().toString();
@@ -111,4 +111,22 @@ test('guest: a mainnet service refuses to start a guest at all', async () => {
   assert.equal(r.why, 'ERR_NOT_TESTNET');
   assert.equal(r.status, 404);
   assert.equal(guestCfg().on, guestCfg().on && true, 'status never claims a guest path it does not have');
+});
+
+test('guest: the welcome crate is sent once, only to a guest that exists', async () => {
+  const sent = [];
+  const send = async (receiverId, acts) => { sent.push(receiverId); return { transaction: { hash: 'H' + sent.length } }; };
+  const view = async () => '0';
+  const missing = await welcome('ghostname1.play.nearcarta.testnet', { net: 'testnet', cfg: CFG, send, view, exists: async () => false });
+  assert.equal(missing.why, 'ERR_NO_ACCOUNT');
+  assert.equal(sent.length, 0, 'a typed name gets no crate');
+  const had = await welcome('hadcrate01.play.nearcarta.testnet', { net: 'testnet', cfg: CFG, send, exists: async () => true, view: async (c, m) => (m === 'ft_balance_of' ? '100' : { total: '12000' }) });
+  assert.equal(had.already, true);
+  assert.equal(sent.length, 0, 'a guest that already holds both items gets nothing more');
+  const first = await welcome('newguest01.play.nearcarta.testnet', { net: 'testnet', cfg: CFG, send, view, exists: async () => true });
+  assert.equal(first.already, undefined);
+  const again = await welcome('newguest01.play.nearcarta.testnet', { net: 'testnet', cfg: CFG, send, view, exists: async () => true });
+  assert.equal(again.already, true);
+  assert.equal(first.items.length, 2, 'test dollars and market space');
+  assert.equal(sent.length, 2, 'asking twice sends nothing the second time');
 });
