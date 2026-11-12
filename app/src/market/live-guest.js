@@ -64,7 +64,11 @@ const b64 = (bytes) => {
 export async function move(calls, opts = {}) {
   for (let i = 0; ; i++) {
     try { return await moveOnce(calls, opts); } catch (e) {
-      if (i >= 4 || !/^(ERR_PRECHECK_(BAG|PURSE)|ERR_NONCE)$/.test(String(e?.code || ''))) throw e;
+      if (i >= 4 || !/^(ERR_PRECHECK_(BAG|PURSE|STORAGE)|ERR_NONCE)$/.test(String(e?.code || ''))) throw e;
+      // Low market storage (the moves before this one wrote new records) is topped up by the relayer for
+      // free, then the move is tried again. Fresh-guest proof 2026-11-12: the House invest was refused
+      // ERR_PRECHECK_STORAGE on the first press and went through on the second.
+      if (e.code === 'ERR_PRECHECK_STORAGE') await ensureSession().catch(() => null);
       await new Promise((r) => setTimeout(r, 1500));
     }
   }
@@ -302,6 +306,8 @@ export async function step(id, ctx = {}) {
     // Arena shelf, so three salt can fetch less than 10 coins; the purse is topped up with more salt first.
     const top = await topUpPurse();
     if (top?.short) return record(id, `Bought a ${shop} share (testnet)`, { hash: top.hash || null, failure: `ERR_PURSE_SHORT: ${coinText(top.have)} of 10 coins after selling more salt. The Arena is paying little for salt right now.` });
+    // The salt gathered and sold above can use the storage the first top-up gave; top it up again.
+    await ensureSession().catch(() => null);
     const r = await move({ method: 'purse', args: { action: 'invest', amount: String(MILLI), shop }, tgas: 20 });
     return record(id, `Bought a ${shop} share (testnet)`, r);
   }
