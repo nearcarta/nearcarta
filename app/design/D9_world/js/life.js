@@ -4,6 +4,10 @@ import * as THREE from 'three';
 import { clock } from './core.js';
 import { W, zecDrop } from './world.js';
 import { CAST, chars } from './chars.js';
+// F34 (film 2026-11-12): the ferryman repeated an old recorded swap ("0.045 wNEAR became 0.177937 USDC")
+// to every visitor, which read as this visitor's swap. Only a swap made in this tab is spoken; the
+// Ferry sets window.__ncSessionSwap with its words after a real swap.
+const swapLine=()=>{ const w=globalThis.__ncSessionSwap; return (typeof w==='string'&&w) ? w : 'The ferry is ready to cross.'; };
 import * as SP from './speech.js';
 
 let seed=11; const rr=()=>(seed=(seed*16807)%2147483647)/2147483647; const pick=a=>a[(rr()*a.length)|0];
@@ -46,7 +50,7 @@ function tickSky(dt){ if(fixed!=null){ W.tod+=(fixed-W.tod)*Math.min(1,dt*1.2); 
 const FV=V(); const boatV={name:'Ferry',voice:.8,top(){ return FV.copy(W.boat.position).setY(W.boat.position.y+1.05); }};
 let fs={ph:0,t:14};
 function tickFerry(dt){ const b=W.boat, J=W.jetty, fm=CAST.ferryman; if(!b||!J.far) return; const u=b.userData; fs.t-=dt;
-  if(fs.ph===0){ if(u.goal!==0) u.goal=0; if(fs.t<=0){ u.goal=2; fs.ph=1; fs.t=30; if(fm) SP.say(fm,'0.045 wNEAR became 0.177937 USDC.',{dur:3,name:fm.name}); } return; }
+  if(fs.ph===0){ if(u.goal!==0) u.goal=0; if(fs.t<=0){ u.goal=2; fs.ph=1; fs.t=30; if(fm) SP.say(fm, swapLine(), {dur:3,name:fm.name}); } return; }
   if(fs.ph===1){ if(b.position.distanceTo(J.far)<.35||fs.t<=0){ zecDrop(b.position); SP.say(boatV,'That swap settled on mainnet.',{dur:3.2}); fs.ph=2; fs.t=4.2; } return; }
   if(fs.ph===2){ if(fs.t<=0){ if(fm) SP.say(fm,'A new quote stays dry until you pay.',{dur:3.4,name:fm.name}); fs.ph=3; fs.t=6; } return; }
   if(fs.ph===3&&fs.t<=0){ u.goal=0; fs.ph=0; fs.t=40; } }

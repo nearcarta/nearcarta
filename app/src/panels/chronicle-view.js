@@ -435,10 +435,12 @@ export function mountChronicleTray(root, hooks = {}) {
   // The rules version the statement is written against: rebuilt from the account's own
   // row-writing transactions, never assumed. Missing history is labelled, not filled in.
   async function rulesNow() {
-    if (state.rules && state.rules.account === state.account && !state.rules.refresh) return state.rules;
+    // F32: only a read that found a version is kept. A slow or failed first read used to stick for the
+    // whole visit, so a row opened today read 'Historic rules: missing' on every statement.
+    if (state.rules && state.rules.account === state.account && !state.rules.refresh && state.rules.version) return state.rules;
     const out = { account: state.account, version: '', why: 'The rules were not read yet.', versions: [] };
     try {
-      const res = await fetch(`${api()}${API_PATH}/chronicle/anchors?account=${encodeURIComponent(state.account)}`, { signal: AbortSignal.timeout(9000) });
+      const res = await fetch(`${api()}${API_PATH}/chronicle/anchors?account=${encodeURIComponent(state.account)}`, { signal: AbortSignal.timeout(20000) });
       if (res.ok) {
         const body = await res.json();
         const built = reconstructRules({

@@ -245,6 +245,7 @@ export function bankMarkup(state) {
       <div class="bank-scroll" data-testid="bank-scroll-log">
       ${flow(LIST)}
       <ul class="bank-log" data-testid="bank-log">${rows || '<li data-testid="bank-log-empty">No audit yet.</li>'}</ul>
+      ${state.fileJson ? `<details class="bank-attest" data-testid="bank-attest" open><summary>Attestation file</summary><pre class="bank-attest-json" data-testid="bank-attest-json">${esc(state.fileJson)}</pre><a class="bank-art" data-testid="bank-attest-download" download="nearcarta-mist-bank-attestation.json" href="data:application/json;charset=utf-8,${encodeURIComponent(state.fileJson)}">Download the file</a></details>` : ''}
       <p class="bank-format" data-testid="bank-held">${esc(state.held || 'Confidential pay stays off. Nothing was spent.')}</p>
       </div>
       <div class="bank-foot" data-testid="bank-foot-log">
@@ -626,6 +627,8 @@ export function mountBankRoom(root, hooks = {}) {
       const j = await r.json();
       const note = j.retention || j.proof?.retention || 'Request and response bytes are not stored.';
       state.fileNote = note;
+      // F33: the button used to change only the note. It now shows the file and offers it as a download.
+      state.fileJson = JSON.stringify(j, null, 2);
       state.held = 'Confidential pay stays off. Nothing was spent.';
       paint();
       return { ok: true, hint: note, say: note, keep: true, kind: 'ok' };

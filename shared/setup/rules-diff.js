@@ -109,9 +109,24 @@ export function formatExpiry(ns, withTime = false) {
 }
 
 /** Visible expiry change. Same calendar text is hidden. Same day with a different clock shows the time. */
+/**
+ * F24 (film 2026-11-12): a reload compared the saved expiry (08:36 UTC) with the chain's (08:37 UTC), a
+ * minute apart because the wallet signed a little after the page computed it, and called the rules
+ * different. Expiries within this window are the same rule.
+ */
+export const EXPIRY_DRIFT_MS = 5 * 60 * 1000;
+export function sameExpiry(a, b, driftMs = EXPIRY_DRIFT_MS) {
+  if (String(a ?? '') === String(b ?? '')) return true;
+  try {
+    const x = BigInt(String(a)), y = BigInt(String(b));
+    if (x === 0n || y === 0n) return false;
+    const d = x > y ? x - y : y - x;
+    return d <= BigInt(driftMs) * 1_000_000n;
+  } catch { return false; }
+}
 export function expiryChange(onChainNs, nextNs) {
   if (nextNs == null || nextNs === '') return null;
-  if (String(onChainNs ?? '') === String(nextNs)) return null;
+  if (sameExpiry(onChainNs, nextNs)) return null;
   const dayOn = formatExpiry(onChainNs);
   const dayNext = formatExpiry(nextNs);
   if (dayOn === dayNext) {
