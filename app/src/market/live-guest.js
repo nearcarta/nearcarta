@@ -45,6 +45,15 @@ export function record(step, what, r) {
 }
 export const txs = () => store().txs || [];
 
+/** Bytes as base64 in a browser or in node (a browser has no Buffer). */
+const b64 = (bytes) => {
+  const u = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  if (typeof btoa !== 'function') return Buffer.from(u).toString('base64');
+  let s = '';
+  for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000));
+  return btoa(s);
+};
+
 /** One move on the market through the testnet relayer: the guest signs a delegate action, the relayer pays. */
 /**
  * A market move right after the one before it can reach the relayer before its RPC has the new block, so
@@ -94,7 +103,7 @@ async function moveOnce(calls, { signer } = {}) {
   const { signedDelegate } = await kp.signDelegateAction(da);
   const res = await fetch(api('/api/relay'), {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ signed_delegate: Buffer.from(encodeSignedDelegate(signedDelegate)).toString('base64') }),
+    body: JSON.stringify({ signed_delegate: b64(encodeSignedDelegate(signedDelegate)) }),
   });
   const j = await res.json().catch(() => ({}));
   if (!res.ok || j.ok === false) throw Object.assign(new Error(j.why || `http ${res.status}`), { code: j.why, detail: j });
