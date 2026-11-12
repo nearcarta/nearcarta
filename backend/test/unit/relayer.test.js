@@ -111,7 +111,7 @@ test('relayer: a guest account is already funded, so the session tops up only it
   const guestId = 'x7k2m9pqrs.play.nearcarta.testnet';
   const r = await session(guestId, {
     acc, guestOf: '.play.nearcarta.testnet',
-    viewAcc: async () => { throw new Error('missing'); }, // never consulted: a guest is known to exist
+    viewAcc: async () => ({}), // the guest exists: its funder created it
     storageOf: async () => 0n,
   });
   assert.equal(r.ok, true);
@@ -124,6 +124,11 @@ test('relayer: a guest account is already funded, so the session tops up only it
   // does not exist, so it is refused rather than funded.
   const plain = await session(guestId, { acc, guestOf: '', viewAcc: async () => { throw new Error('missing'); }, storageOf: async () => 0n });
   assert.equal(plain.why, 'ERR_NO_ACCOUNT');
+  // A name under the guest parent that nobody created gets nothing: no storage deposit for a typed name.
+  const before = calls.length;
+  const typed = await session('nobodymade.play.nearcarta.testnet', { acc, guestOf: '.play.nearcarta.testnet', viewAcc: async () => { throw new Error('missing'); }, storageOf: async () => 0n });
+  assert.equal(typed.why, 'ERR_NO_ACCOUNT');
+  assert.equal(calls.length, before, 'nothing was sent');
 });
 
 test('relayer: a guest key is full-access, and only a guest suffix makes that acceptable', async () => {
