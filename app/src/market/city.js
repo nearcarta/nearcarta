@@ -11,6 +11,9 @@ import * as G from '/shared/market/guide.js';
 import * as Q from '/shared/market/story.js';
 import { createStrip } from '/market/quest-strip.js';
 import * as R from '/market/live-play.js';
+// The guest's real path on testnet. Same module shape as the email-wallet one, so the city drives
+// whichever is signed in without knowing which.
+import * as GT from '/market/live-guest.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -154,8 +157,26 @@ const whyBlock = (good) => { const q = S.quoteAt(city, 'arena', good); return `<
 // Only the steps with a market move are real; the rest say so: practice, no spend.
 const REAL_STEP = { seal: 'The Bank seals it for you and pays the gas', cargo: 'Free: 3 salt from the berths', sell: 'Coins go into your purse', invest: 'Spends 10 coins (0.001 NEAR) from your purse' };
 const nearTxt = (y) => { const v = Number(BigInt(y || 0) / 10n ** 18n) / 1e6; return `${v.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')} NEAR`; };
-const costLine = (s) => (!R.on() && R.DEMO_STEPS.includes(s.id) ? 'Real move, played with the city’s demo purse · the city pays the gas' : R.on() && REAL_STEP[s.id] ? `${REAL_STEP[s.id]} · no gas, the city pays it` : '<span class="qs-chip">Practice, no spend</span>');
+const testnetPill = '<span class="qs-net-pill" data-testid="testnet-pill">TESTNET</span>';
+const costLine = (s) => (GT.on() && GT.GUEST_STEPS.includes(s.id)
+  ? `${testnetPill} Real testnet move · free`
+  : (!R.on() && R.DEMO_STEPS.includes(s.id) ? 'Real move, played with the city’s demo purse · the city pays the gas' : R.on() && REAL_STEP[s.id] ? `${REAL_STEP[s.id]} · no gas, the city pays it` : '<span class="qs-chip">Practice, no spend</span>'));
+// One pill a judge cannot miss, plus the receipt link, on every real guest step.
+const guestReceipt = (r) => {
+  const pill = testnetPill;
+  if (r.real?.refused_hash) {
+    return `${pill} The con artist was refused on testnet · <a class="qs-proof" href="${txUrl(esc(r.real.refused_hash))}" target="_blank" rel="noopener">Refused ↗</a>${r.real.hash ? ` · <a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Paid ↗</a>` : ''}`;
+  }
+  if (r.real?.broadcast === false) {
+    // No Base Sepolia ETH: the MPC signature is real, the foreign transaction is not sent.
+    const signed = r.real.raw_signed ? ` Signed transaction: <code>${esc(String(r.real.raw_signed).slice(0, 22))}…</code>` : '';
+    return `${pill} Signed by NEAR's MPC network on testnet, not sent to Base Sepolia.${signed}${r.real.hash ? ` <a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Signature ↗</a>` : ''}`;
+  }
+  if (r.real?.hash) return `${pill} <a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Receipt ↗</a> · a real testnet transaction`;
+  return `${pill} No transaction this time. Practice mode still works.`;
+};
 const receiptLine = (step, r) => {
+  if (GT.on() && r.real) return guestReceipt(r);
   if (r.real?.hash && r.real.demo) return `Played with the city’s demo purse · <a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Receipt ↗</a> · the city paid ${esc(r.real.burnt_near)} NEAR gas`;
   if (r.real?.hash) return `<a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Receipt ↗</a> · you paid 0 NEAR${r.real.burnt_near ? `, the city paid ${esc(r.real.burnt_near)} NEAR gas` : ''}`;
   return '<span class="qs-chip">Practice, no spend</span>';
@@ -204,7 +225,8 @@ async function stripClick(a, b) {
     if (a === 'act') {
       if (busy) return;
       const step = Q.current(city); let real = null;
-      if (R.on()) { busy = true; flash = { shop: inShop, text: 'One moment…' }; paintStrip(); try { real = await R.step(step.id, { shop: Q.state(city).dark || 'ferry' }); } finally { busy = false; } }
+      if (GT.on()) { busy = true; flash = { shop: inShop, text: 'Sending one testnet transaction…' }; paintStrip(); try { real = await GT.step(step.id, { shop: Q.state(city).dark || 'ferry' }); } finally { busy = false; } }
+      else if (R.on()) { busy = true; flash = { shop: inShop, text: 'One moment…' }; paintStrip(); try { real = await R.step(step.id, { shop: Q.state(city).dark || 'ferry' }); } finally { busy = false; } }
       else if (R.DEMO_STEPS.includes(step.id)) { busy = true; flash = { shop: inShop, text: 'One moment…' }; paintStrip(); try { real = await R.demo(step.id); } finally { busy = false; } }
       const res = Q.act(city, inShop); if (real) { res.real = real; if (step.id === 'sell' && real.total != null && BigInt(real.total) > 0n) res.total = BigInt(real.total); }
       lastDone = { shop: inShop, step, res }; lastDeed = { shop: inShop, text: DEED[step.id] };

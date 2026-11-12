@@ -179,7 +179,26 @@
       "global_day": 400,
       "funder_floor_near": 10
     },
-    "note": "The account name is base32(sha256(public_key))[0..10] plus the parent, so a retry is idempotent. The secret key never leaves the browser."
+    "note": "The account name is base32(sha256(public_key))[0..10] plus the parent, so a retry is idempotent. The secret key never leaves the browser.",
+    "row": {
+      "receivers": [
+        "board.nearcarta.testnet",
+        "arena.nearcarta.testnet",
+        "guard.nearcarta.testnet",
+        "townhall.nearcarta.testnet",
+        "house.nearcarta.testnet",
+        "toll.nearcarta.testnet",
+        "tusdc.nearcarta.testnet"
+      ],
+      "per_action_cap": "5000000000000000000000",
+      "daily_budget": "20000000000000000000000",
+      "max_actions_per_day": 8,
+      "row_fund": "1000000000000000000000",
+      "row_deposit": "40000000000000000000000",
+      "calls_deposit": "5000000000000000000000",
+      "method": "propose",
+      "note": "The guest defaults for /setup. Built from testnet.json's shops so no account name is written twice. 0.005 per action, 0.02 a day, 8 actions, 0.001 spendable in the row."
+    }
   },
   "oneclick": "https://1click.chaindefuser.com",
   "intents_note": "NEAR Intents has no testnet deployment, so every Intents call from the guest story is a live dry quote against mainnet prices and says so in the UI.",
@@ -194,5 +213,26 @@
     "tusdc.nearcarta.testnet",
     "toll.nearcarta.testnet",
     "keeper-*.nearcarta.testnet (keepers-deploy.js)"
-  ]
+  ],
+  "shops": {
+    "board": "board.nearcarta.testnet",
+    "market": "arena.nearcarta.testnet",
+    "guard": "guard.nearcarta.testnet",
+    "townhall": "townhall.nearcarta.testnet",
+    "house": "house.nearcarta.testnet",
+    "toll": "toll.nearcarta.testnet",
+    "tusdc": "tusdc.nearcarta.testnet",
+    "keeper-arena": "keeper-arena.nearcarta.testnet",
+    "keeper-hall": "keeper-hall.nearcarta.testnet",
+    "keeper-ferry": "keeper-ferry.nearcarta.testnet",
+    "keeper-toll": "keeper-toll.nearcarta.testnet",
+    "keeper-guard": "keeper-guard.nearcarta.testnet",
+    "keeper-bank": "keeper-bank.nearcarta.testnet",
+    "keeper-house": "keeper-house.nearcarta.testnet",
+    "keeper-payouts": "keeper-payouts.nearcarta.testnet",
+    "keeper-chronicle": "keeper-chronicle.nearcarta.testnet",
+    "tollTo": "keeper-toll.nearcarta.testnet",
+    "lookalike": "keeper-guard.nearcarta.testnet0",
+    "note": "The shop names a guest row may reach. app/src/net/net.js publishes this map on the page, so no page hardcodes an account id. `lookalike` is a real, separate testnet account registered by the operator so the Guardhouse step can refuse it on chain; it is not a payee of any other shop."
+  }
 }

@@ -27,6 +27,14 @@ const shops = dist + '/design/D8_shops';
 cpSync(here + 'design/D8_shops/data/live.js', shops + '/data/live.snapshot.js');
 cpSync(here + 'src/live/shops-live.js', shops + '/data/live.js');
 rmSync(dist + '/live/shops-live.js');
+// The guest's real testnet path. It imports near-api-js lazily and only when a guest presses a step, so
+// a visitor who never presses Try free never downloads it.
+mkdirSync(dist + '/market', { recursive: true });
+await (await import('esbuild')).build({
+  entryPoints: [here + 'src/market/live-guest.js'], bundle: true, format: 'esm', target: 'es2022',
+  outfile: dist + '/market/live-guest.js', logLevel: 'warning',
+  define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis' },
+});
 // The Ferry checks quotes with the server's own guard (dependency-free module), so the two cannot drift.
 cpSync(here + '../backend/src/ferry-guard.js', dist + '/live/ferry-guard.js');
 await (await import('esbuild')).build({ entryPoints: [here + 'src/ferry-pay.js'], bundle: true, format: 'iife', target: 'es2022', outfile: dist + '/ferry-pay.js', logLevel: 'warning' });
@@ -157,7 +165,7 @@ const scrubPairs = [
   [new RegExp(codes(117, 116, 101, 115, 116, 49), 'gi'), 'ucheck'],
 ];
 // Files the guest path owns, relative to dist.
-const GUEST_OWNED = [/^shared\/net\/net\.js$/, /^net\/chrome\.js$/, /^guest\/key\.js$/];
+const GUEST_OWNED = [/^shared\/net\/net\.js$/, /^net\/chrome\.js$/, /^guest\/key\.js$/, /^market\/live-guest\.js$/];
 function scrub(dir, base = '') {
   for (const name of readdirSync(dir)) {
     const path = dir + '/' + name;
