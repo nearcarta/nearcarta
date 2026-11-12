@@ -1,11 +1,17 @@
 # Verify with commands
 
-The town runs on NEAR mainnet. Every command below is read-only.
+Nearcarta runs on NEAR mainnet. Every command below is read-only: nothing signs or spends.
 
-1. Recorded mainnet txs exist and have the stated outcome: `npm run verify:mainnet` → `205/205 mainnet txs found` (output in `judges/proofs/mainnet-proof-check.json`). Each tx opens on https://nearblocks.io.
-2. The agent key on a visitor's row can only call board methods: `near account list-keys <visitor> network-config mainnet now` (NEAR CLI) → a `FunctionCall` key limited to the board. The row's own agent key is `propose`, `propose_call`, `propose_call_as`, `confirm_hold`, `tighten_rules` and `anchor`. The old per-visitor charter account was reaped when this became one shared board (`board.nearcarta.near`); its `propose`/`propose_batch` key no longer exists. `curl -s https://nearcarta-api.onrender.com/api/mainnet` returns the live accounts.
-3. API health names mainnet: `curl -s https://nearcarta-api.onrender.com/api/health` → `network.contracts: mainnet`, `near.chain_id: mainnet`.
-4. Ferry tokens and a dry quote: `curl -s https://nearcarta.vercel.app/api/ferry/tokens` lists the 1Click tokens; *Get dry quote* on `/ferry-widget` shows 3 PASS rows and creates no deposit address.
-5. NEAR AI TEE: open `/tee-public.json` for the recorded attestation summary; the Mist Bank *Verify the TEE now* button calls `GET /api/ai/tee` live.
-6. Unit tests: `npm test`. Contracts: `cargo test --lib` in each crate under `contracts/`. Browser: `BASE_URL=https://nearcarta.vercel.app npm run e2e`.
-7. Secrets: `gitleaks git --config .gitleaks.toml --redact .` → no leaks.
+| # | Command | Expected |
+|---|---|---|
+| 1 | `curl -s https://nearcarta.vercel.app/api/health` | `"network":{"name":"mainnet",...}`, `"near":{"chain_id":"mainnet",...}`, `"features":{...,"signing":false}` |
+| 2 | `curl -s "https://nearcarta.vercel.app/api/ai/tee?nonce=$(openssl rand -hex 32)"` | NEAR AI Cloud attestation: `"tcbStatus":"UpToDate"`, every field in `checks` is `true`, `nonce` echoes yours |
+| 3 | `simulate` on `board.nearcarta.near` for the demo row (the RPC command is in README.md, Verify it yourself) | `{"ok":false,"reason":"frozen",...}` |
+| 4 | `view_account` on `board`, `toll`, `arena`, `house`, `guard`, `townhall` `.nearcarta.near` | The code hashes in README.md, Contracts on mainnet; CI job `reproducible` rebuilds each one from source |
+| 5 | `view_access_key_list` on `board.nearcarta.near` | `"keys":[]` |
+| 6 | `npm ci && npm test` | 1140 tests, 1139 pass, 1 skipped (it would sign a real transaction) |
+| 7 | `npm run verify:mainnet` | `205/205 mainnet txs found`, written to `judges/proofs/mainnet-proof-check.json`. Rows marked `failure: true` are intended refusals |
+| 8 | `cargo test --lib` in any crate under `contracts/` | All pass; CI runs 400 contract unit tests and 61 sandbox tests |
+| 9 | `gitleaks git --config .gitleaks.toml --redact .` | no leaks found |
+
+Every transaction cited in README.md opens on https://nearblocks.io (mainnet), https://testnet.nearblocks.io (testnet) or https://basescan.org (Base).
