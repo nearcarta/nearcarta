@@ -13,6 +13,10 @@ const STEPS = [
   { t: 'Try a shop', b: '<ul class="ob-shops">' + SHOPS.map(k => `<li><b>${NAME[k]}</b><span>${SUB[k]}</span></li>`).join('') + '</ul>' },
 ];
 export function maybeOnboard() {
+  // The town's front door has its own gold Try free and Play for real. A modal tour on top of it hid
+  // Try free from a first-time visitor (fresh incognito window, 2026-11-12): the click landed on the
+  // tour's mainnet "Connect" step instead of starting the free testnet guest. So no tour there.
+  if (document.querySelector('[data-testid="try-free"], #netChrome')) return;
   if (seen() || document.getElementById('onboard') || /[?&](e2e|noob)\b/.test(location.search) || navigator.webdriver && !/[?&]ob\b/.test(location.search)) return;
   let i = 0; const d = document.createElement('div'); d.id = 'onboard'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true'); d.setAttribute('aria-labelledby', 'ob-t');
   const close = () => { done(); d.classList.add('out'); setTimeout(() => d.remove(), 220); document.removeEventListener('keydown', key); };

@@ -47,7 +47,7 @@ export const guestCfg = () => ({
   board: DEP.board?.contract || '',
   welcomeUsdc: String(DEP.guest?.welcome?.tusdc || '100000000'),
   marketStorage: toYocto(DEP.guest?.welcome?.market_storage_near || '0.012'),
-  perIpDay: Number(process.env.GUEST_PER_IP_DAY || DEP.guest?.caps?.per_ip_day || 3),
+  perIpDay: Number(process.env.GUEST_PER_IP_DAY || DEP.guest?.caps?.per_ip_day || 20),
   globalDay: Number(process.env.GUEST_GLOBAL_DAY || DEP.guest?.caps?.global_day || 400),
   funderFloor: toYocto(process.env.GUEST_FUNDER_FLOOR_NEAR || DEP.guest?.caps?.funder_floor_near || '10'),
   turnstile: (process.env.GUEST_TURNSTILE_SECRET || '').trim() || null,
