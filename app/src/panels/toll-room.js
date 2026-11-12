@@ -264,7 +264,7 @@ export function foreignExplorer(chain, hash) {
   if (!/^0x[0-9a-fA-F]{64}$/.test(String(hash || ''))) return '';
   // A Sepolia chain (84532, 421614 or the word) or a page on testnet links the Sepolia explorer.
   const c = String(chain || '');
-  const test = /sepolia|84532|421614/i.test(c) || NET === 'testnet';
+  const test = /sepolia|84532|421614/i.test(c) || (NET && NET !== 'mainnet');
   const arb = /arbitrum|421614|42161/i.test(c);
   const host = arb ? (test ? 'https://sepolia.arbiscan.io/tx/' : 'https://arbiscan.io/tx/') : (test ? 'https://sepolia.basescan.org/tx/' : 'https://basescan.org/tx/');
   return host + hash;

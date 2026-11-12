@@ -23,6 +23,8 @@ const OWNERS = [
   /^guest\/key\.js$/,
   /^guest\/near\.js$/,
   /^market\/live-guest\.js$/,
+  // The Market Day strip: its guest check and the TESTNET pill only show once a guest exists.
+  /^market\/city\.js$/,
   /^judges-run\.js$/,
   /^net\/scam\.js$/,
   /^shared\/deployments\/testnet\.json$/,
