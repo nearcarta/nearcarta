@@ -49,7 +49,8 @@ test('F64: the mainnet client has more than one RPC, and every client read can f
 test('F64: a wallet that never answers is reported in words, not an endless "waiting"', () => {
   const a = read('app/design/D8_shops/js/apps.js');
   assert.match(a, /export const SIGN_WAIT_MS = 120_000/);
-  assert.match(a, /inTime\(w\.signAndSendTransaction\(/);
+  // F61d: the page waits SIGN_WAIT_MS on the wallet request itself (kept open until the wallet settles it).
+  assert.match(a, /await inTime\(raw, SIGN_WAIT_MS, 'The wallet'\)/);
   assert.match(a, /did not answer in/);
 });
 

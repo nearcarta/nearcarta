@@ -245,18 +245,45 @@ export function userCancelled(e) {
 // press can be repeated (a second cancel of the same hold is refused on chain, it never refunds twice).
 export const SIGN_WAIT_MS = 120_000;
 const inTime = (p, ms, what) => { let t; return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => rej(Object.assign(new Error(`${what} did not answer in ${Math.round(ms / 1000)} s. If no wallet window opened, allow pop-ups and press again; nothing new was signed here.`), { timeout: true })), ms); })]).finally(() => clearTimeout(t)); };
+// F61d (film 2026-11-12): a wallet request that outlived its wait (a Guard cancel_hold during a
+// 429 hang) stayed open in the wallet, and the next room's request got ITS answer: Toll took
+// the cancel_hold hash as its set_effects and went on to cross without a budget. One wallet
+// request at a time, across rooms, until the wallet itself settles it; and an answer is only
+// accepted when the chain shows it is the transaction that was asked for.
+let walletOpen = null;
 async function sign(receiverId, actions) {
-  const hook = globalThis.__NC_WALLET_SIGN;
-  if (typeof hook === 'function') {
-    const h = await inTime(Promise.resolve(hook(receiverId, actions)), SIGN_WAIT_MS, 'The wallet');
-    rpc?.clear?.(); noteFinal(h);
-    return h;
+  const method = actions?.[0]?.params?.methodName || actions?.[0]?.type || 'transaction';
+  if (walletOpen) {
+    const e = new Error(`Your wallet still has an earlier request open (${walletOpen}). Approve or close it in the wallet, then press again. Nothing else was signed.`);
+    e.walletBusy = true; throw e;
   }
-  const w = await inTime(conn.wallet(), 30_000, 'The wallet');
-  const r = await inTime(w.signAndSendTransaction({ receiverId, actions }), SIGN_WAIT_MS, 'The wallet');
-  const h = W.txHashOf(r);
-  rpc?.clear?.(); noteFinal(h);
+  walletOpen = method;
+  const hook = globalThis.__NC_WALLET_SIGN;
+  let raw;
+  if (typeof hook === 'function') raw = Promise.resolve(hook(receiverId, actions));
+  else raw = inTime(conn.wallet(), 30_000, 'The wallet').then(w => w.signAndSendTransaction({ receiverId, actions })).then(r => W.txHashOf(r));
+  // The lock is released when the wallet answers, not when this page stops waiting.
+  raw.then(() => { walletOpen = null; }, () => { walletOpen = null; });
+  const h = await inTime(raw, SIGN_WAIT_MS, 'The wallet');
+  rpc?.clear?.();
+  await sameRequest(h, receiverId, method);
+  noteFinal(h);
   return h;
+}
+/** The chain's record of `h` must be this receiver and method. Unknown (RPC down) is accepted. */
+async function sameRequest(h, receiverId, method) {
+  if (!h || !S.me) return;
+  for (let i = 0; i < 3; i++) {
+    const t = await rpc('tx', { tx_hash: h, sender_account_id: S.me, wait_until: 'NONE' }).catch(() => null);
+    const tx = t?.transaction;
+    if (!tx) { await new Promise(r => setTimeout(r, 800)); continue; }
+    const got = tx.actions?.[0]?.FunctionCall?.method_name || '';
+    if (tx.receiver_id !== receiverId || (method !== 'transaction' && got && got !== method)) {
+      const e = new Error(`The wallet answered an earlier request (${got || tx.receiver_id}) instead of this one (${method}). Nothing else was sent. Press again.`);
+      e.staleWallet = true; e.tx = null; throw e;
+    }
+    return;
+  }
 }
 const fc = (methodName, args, tg = 40, deposit = '0') => ({ type: 'FunctionCall', params: { methodName, args, gas: (BigInt(tg) * TG).toString(), deposit } });
 
@@ -322,8 +349,13 @@ export async function houseCall(plan, { receiver, method } = {}) {
   // A `signed` order whose Base receipt already succeeded is done; the relay says `paid` and
   // re-sends nothing, and this press then buys a new pass as usual.
   const mineNow = (await rowOrders(TS.TOLL_ACCT, S.me)).filter(o => o.status === 'open' || o.status === 'signing' || o.status === 'signed').reverse();
+  // F61d: while any crossing of this row is open (paid, not signed) nothing new is crossed or
+  // budgeted: it is finished, or the visitor is told to finish it first.
+  const open = mineNow.find(o => o.status === 'open' || o.status === 'signing');
+  if (open && !(open.to === wanted.to && open.asset === wanted.asset)) {
+    throw new Error(`Crossing #${open.id} is paid and still open. Press Finish crossing to send it first. Nothing was signed.`);
+  }
   for (const o of mineNow) {
-    if (o.status === 'open' && !(o.to === wanted.to && o.asset === wanted.asset)) continue;
     const done = await finishCross(TS.TOLL_ACCT, o, { reused: true });
     if (done.relay?.claim === 'paid' && o.status === 'signed') continue;
     return done;
@@ -654,7 +686,7 @@ export async function toll(quote) {
     let order = null;
     for (let i = 0; i < 6 && !order; i++) {
       if (i) await new Promise(r => setTimeout(r, 1200));
-      order = (await rowOrders(shop, S.me)).find(o => String(o.action_id) === String(nonce)) || null;
+      order = (await rowOrders(shop, S.me).catch(() => [])).find(o => String(o.action_id) === String(nonce)) || null;
     }
     if (!order) {
       return { tx: signed.hash, decision: 'allowed', reason: 'stored', action: nonce, amount: deposit, receiver: shop, signer: 'agent', needsSignature: true,
@@ -673,6 +705,22 @@ export async function toll(quote) {
  * walk stops at the first missing id. A read that errors is retried, never taken as "none".
  */
 export const tollAcct = () => TS.TOLL_ACCT;
+/**
+ * F61d: Finish crossing. Exactly this row's stored order, by id: sign_cross (one wallet
+ * approval), wait for the MPC signature, relay it to Base. Never cross, propose or set_effects.
+ */
+export async function finishOrder(id) {
+  if (!S.me) throw new Error('Sign in first. Nothing was signed.');
+  let o;
+  for (let t = 0; t < 4 && o === undefined; t++) {
+    if (t) await new Promise(r => setTimeout(r, 900));
+    o = await W.viewFn(rpc, TS.TOLL_ACCT, 'get_order', { id: Number(id) }).then(v => v ?? null, () => undefined);
+  }
+  if (o === undefined) throw new Error('Crossing #' + id + ' did not read right now. Nothing was signed. Press again in a moment.');
+  if (!o || o.row_owner !== S.me) throw new Error('Crossing #' + id + ' is not on this row. Nothing was signed.');
+  if (!['open', 'signing', 'signed'].includes(o.status)) throw new Error(`Crossing #${id} is ${o.status}. Nothing was signed.`);
+  return finishCross(TS.TOLL_ACCT, o, { reused: true });
+}
 /**
  * F61c: this row's own Base address, derived now from the MPC key for the toll and the path
  * `row:<owner>:base`, without waiting for a first signature. Balance read from Base, or null.
@@ -699,7 +747,10 @@ export async function rowOrders(shop, owner) {
       if (o !== undefined) break;
       await new Promise(r => setTimeout(r, 500));
     }
-    if (o === undefined || o === null) break;
+    // F61d: an id that would not read is not "no more orders": a partial list once sent a
+    // second cross past a paid one. The caller stops instead.
+    if (o === undefined) throw new Error('Your crossings on the toll did not read right now. Nothing was signed. Press again in a moment.');
+    if (o === null) break;
     if (o.row_owner === owner) out.push(o);
   }
   return out;
@@ -719,7 +770,7 @@ async function finishCross(shop, order, { reused = false, passTx = null, amount 
     catch (e) {
       const why = userCancelled(e) ? 'the wallet was closed' : String(e?.message || e).slice(0, 140);
       return { ...base, tx: passTx, reason: 'stored', needsSignature: true,
-        note: `The pass is paid and the crossing is stored, but it is not signed yet (${why}). Press Pay on Base again to sign it. No second pass is charged.` };
+        note: `The pass is paid and the crossing is stored, but it is not signed yet (${why}). Press Finish crossing again to sign it. No second pass is charged.` };
     }
     if (signTx) keep(signTx, 'toll', 'allowed', 'sign_cross', { amt: '', to: shop });
   }
@@ -734,10 +785,10 @@ async function finishCross(shop, order, { reused = false, passTx = null, amount 
   }
   if (cur.status !== 'signed' || cur.tx_nonce == null) {
     return { ...base, tx: signTx || passTx, reason: 'signing', signTx,
-      relay: { ok: false, text: 'Signed on NEAR. The MPC signature is not on the toll yet. Press Pay on Base again in a minute to send it. No second pass is charged.' } };
+      relay: { ok: false, text: 'Signed on NEAR. The MPC signature is not on the toll yet. Press Finish crossing again in a minute to send it. No second pass is charged.' } };
   }
   const relay = await api('/api/toll/relay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: Number(cur.tx_nonce) }) })
-    .catch(e => ({ ok: false, text: `The relay did not answer (${String(e?.message || e).slice(0, 80)}). Press Pay on Base again to send it. No second pass is charged.` }));
+    .catch(e => ({ ok: false, text: `The relay did not answer (${String(e?.message || e).slice(0, 80)}). Press Finish crossing again to send it. No second pass is charged.` }));
   return { ...base, tx: signTx || passTx, reason: 'ok', signTx, relay };
 }
 
@@ -1426,9 +1477,9 @@ async function ensureTollEffect({ asset, to, units }) {
     }
     // F49: the budget write is a receipt of its own, so "What the chain saw" lists its link.
     if (budgetTx) keep(budgetTx, 'toll', 'allowed', 'set_effects', { amt: '', to: S.board });
-    // The wallet answered for a successful write, so a slow read does not stop the press: the
-    // board checks the budget itself when the crossing arrives.
-    void ok;
+    // F61d: never cross without the budget on chain. A wallet that answered a different request
+    // (see sign) or a write that did not land would cost a pass and fail ERR_EFFECT.
+    if (!ok) throw new Error('Your Base budget is not on the board yet. Nothing else was signed. Press again in a moment.');
   }
   return next.filter(e => e.chain === 'base' && e.asset === asset).reduce((a, e) => a + BigInt(e.value), 0n).toString();
 }
