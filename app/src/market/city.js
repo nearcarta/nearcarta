@@ -103,6 +103,7 @@ root.innerHTML = `
     <span class="md-reward" data-k="reward" data-testid="md-reward" hidden></span>
   </div>
   <button type="button" class="md-purse" data-v="receipt" data-testid="md-receipt" aria-label="Purse and receipt"><span class="i" data-k="pi">${ICON.coin}</span><b data-k="near"></b></button>
+  <button type="button" class="md-new" data-testid="md-newday" data-k="newday" hidden>Start a new day</button>
   <button type="button" class="md-exit" data-testid="md-exit" aria-label="Leave Market Day"><span class="i">${ICON.close}</span></button>
 </div>
 <div class="md-toasts" aria-live="polite"></div>
@@ -156,6 +157,9 @@ function hud() {
     reward.hidden = !done;
     reward.innerHTML = done ? `${ICON.seal} <b>Day ${Q.state(city).day} sealed</b> <small>${REWARD_LINE()}</small>` : '';
   }
+  // F25: a day in progress or a finished day can always be started over from the HUD.
+  const nd = K('newday');
+  if (nd) { nd.hidden = pr.done === 0; nd.classList.toggle('gold', pr.done >= pr.total); }
   K('near').textContent = purse();
   K('pi').innerHTML = Q.state(city).sealed ? ICON.seal : ICON.coin;
   const n = Object.entries(p.bag).filter(([g]) => !g.startsWith('share:')).reduce((a, [, v]) => a + v, 0);
@@ -550,6 +554,7 @@ function enter() {
   try { WD().guideLook?.('crier'); } catch {}
   lastT = performance.now(); lastPhase = null; dawnOrders(); hud(); quest();
   R.resume().then(() => { readPurse(); if (!R.on() && !GT.on() && !R.live.practice && Q.progress(city).done === 0) setTimeout(() => { if (playing && !view) open('signin'); }, 900); });
+  if (Q.finished(city)) setTimeout(() => { if (playing) { try { WD().guideSay?.('Your last day is sealed. Start a new day from the top bar.', { dur: 4 }); } catch {} } }, 1200);
   setTimeout(() => { aim(); if (!Q.state(city).met.intro) { Q.state(city).met.intro = 1; save(); WD().guideSay?.('New merchant? Earn your first coin by dusk.', { dur: 4.2 }); } }, 500);
   clearInterval(timer); timer = setInterval(() => { const now = performance.now(); S.advance(city, Math.round((now - lastT) / 1000)); lastT += Math.round((now - lastT) / 1000) * 1000; hud(); save(); }, 1000);
 }
@@ -559,13 +564,36 @@ function leave() {
   history.replaceState(null, '', location.pathname + location.search.replace(/([?&])play(&|$)/, '$1').replace(/[?&]$/, ''));
   (lifeMod ||= import('/design/D9_world/js/life.js').catch(() => null)).then((L) => L?.setSky?.('auto'));
 }
+/**
+ * F25 (film 2026-11-12): Market Day resumed old progress from this browser (7/9, step 8) and a player
+ * had no way to start over. This resets ONLY the local quest: the practice city in
+ * 'nearcarta.marketday.v1' and the day's receipt list in 'nearcarta.marketday.live'. The signed-in
+ * account and a rented stall stay; sign-in, setup, vault, agent and Privy keys are never touched.
+ */
+export const DAY_KEYS = Object.freeze([KEY, 'nearcarta.marketday.live']);
+function newDay({ quiet = false } = {}) {
+  city = S.createCity();
+  try { localStorage.removeItem(KEY); } catch {}
+  save();
+  try { delete R.live.txs; localStorage.setItem('nearcarta.marketday.live', JSON.stringify(R.live)); } catch {}
+  realPurse = null; lastPhase = null; dawnOrders();
+  if (!playing) { hud(); quest(); return; }
+  close(); hud(); quest(); refresh(); aim();
+  if (!quiet) { try { WD().guideSay?.('A new day. The Hall has work.', { dur: 2.6 }); } catch {} }
+}
+root.querySelector('.md-new').addEventListener('click', () => newDay());
 root.querySelector('.md-enter').addEventListener('click', enter);
 root.querySelector('.md-exit').addEventListener('click', leave);
 
 function mount() {
   document.body.append(root);
+  // '/?play=new' starts a fresh day on load, then the address goes back to '?play' so a reload resumes it.
+  if (/[?&]play=new\b/.test(location.search)) {
+    newDay({ quiet: true });
+    history.replaceState(null, '', location.pathname + location.search.replace(/([?&])play=new\b/, '$1play') + location.hash);
+  }
   hud(); quest();
   if (/[?&]play\b/.test(location.search)) { const go_ = () => (window.__ready ? (enter(), /[?&]receipt\b/.test(location.search) && setTimeout(() => open('receipt'), 600)) : setTimeout(go_, 300)); go_(); }
 }
 if (document.readyState === 'loading') addEventListener('DOMContentLoaded', mount); else mount();
-window.__marketday = { get city() { return city; }, live: R, enter, leave, open, go, story: Q, reset() { city = S.createCity(); save(); hud(); quest(); refresh(); aim(); } };
+window.__marketday = { get city() { return city; }, live: R, enter, leave, open, go, story: Q, reset() { newDay({ quiet: true }); }, newDay };
