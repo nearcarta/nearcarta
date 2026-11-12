@@ -2,22 +2,28 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { rowHeadroomBytes, ROW_STORAGE_BYTES } from '../../../shared/board/session.js';
+import MAIN from '../../../shared/deployments/mainnet.json' with { type: 'json' };
 const read = p => readFileSync(new URL('../../../' + p, import.meta.url), 'utf8');
 
 test('headroom comes from the chain storage_locked, not from a model of a fresh row', () => {
   // The live row on 2026-11-07 reported storage_locked of exactly 0.02 NEAR while the
   // pairBudgetBytes model still claimed 554 free bytes. set_rules then panicked
   // ERR_ROW_TOO_BIG after the visitor had already approved the wallet call.
-  assert.equal(rowHeadroomBytes({ storage_locked: '20000000000000000000000' }), 0);
-  assert.equal(rowHeadroomBytes({ storage_locked: '17940000000000000000000' }), 206);
+  // The live board (code 51kKGvtV…) caps a row at 0.04 NEAR = 4000 bytes.
+  assert.equal(rowHeadroomBytes({ storage_locked: '40000000000000000000000' }), 0);
+  assert.equal(rowHeadroomBytes({ storage_locked: '37940000000000000000000' }), 206);
+  // The live eight-receiver row 8ccd5d33 locks 0.03469 NEAR, so 531 bytes are left.
+  assert.equal(rowHeadroomBytes({ storage_locked: '34690000000000000000000' }), 531);
   assert.equal(rowHeadroomBytes({}), null, 'an unknown row must not be guessed');
-  assert.equal(ROW_STORAGE_BYTES, 2000);
+  assert.equal(ROW_STORAGE_BYTES, 4000);
+  // and the page budget is the same number the chain reports
+  assert.equal(ROW_STORAGE_BYTES * 1e19, Number(MAIN.board.max_row_yocto));
 });
 
 test('the rules step refuses a full row before the wallet opens', () => {
   const setup = read('app/house/setup.js');
   assert.match(setup, /rowHeadroomBytes\(chainRow\)/, 'it reads the chain number');
-  assert.match(setup, /This row is full: its 0\.02 NEAR of storage is all used/);
+  assert.match(setup, /This row is full: its \$\{fmtN\(ROW_NEAR\)\} NEAR of storage is all used/);
   // A cap-only edit does not grow the row, so it must still be allowed.
   assert.match(setup, /const adds = r\.receivers\.some\(a => !known\.has\(String\(a\)\)\)/);
   assert.match(setup, /room === 0 && adds/);

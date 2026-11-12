@@ -80,16 +80,22 @@ test('the shorter list is narrower than the one that failed, and the guard block
   // because the account that used to be reachable only by `ft_transfer` now really answers on
   // `post_job`, `bid`, `counter`, `accept`, `deliver`, `review` and `refund`.
   assert.ok(bytesOf(calls) > bytesOf(oldStyle), 'the Hall lifecycle is wider than one ft_transfer');
-  // Still too much for one row at six receivers, so the page must refuse it.
-  assert.equal(callsFitRow(calls, receivers.length), false, 'six receivers cannot hold this list');
-  assert.ok(bytesOf(calls) > pairBudgetBytes(receivers.length));
+  // On the old 2000-byte board six receivers could not hold this list (budget 366 bytes).
+  assert.ok(bytesOf(calls) > 2000 - 1490 - 24 * 6);
+  // The live board caps a row at 4000 bytes, so the same six-shop list now fits.
+  assert.equal(callsFitRow(calls, receivers.length), true, 'six receivers hold this list on the live board');
+  assert.ok(bytesOf(calls) <= pairBudgetBytes(receivers.length));
 });
 
 test('a list that does not fit is shrunk to one that does, keeping the shops that need a call', () => {
-  const receivers = ['toll.nearcarta.near', 'wrap.near', 'arena.nearcarta.near', 'house.nearcarta.near', 'townhall.nearcarta.near', 'guard.nearcarta.near'];
-  const keep = fittingShops(receivers, build);
+  // Long plain payees push this eight-receiver list past the 4000-byte row.
+  const pad = i => `payee${i}${'x'.repeat(52)}.near`;
+  const receivers = ['toll.nearcarta.near', pad(1), 'arena.nearcarta.near', 'house.nearcarta.near', 'townhall.nearcarta.near', 'guard.nearcarta.near', pad(2), pad(3)];
+  const wide = list => [...build(list), ...list.filter(r => r.startsWith('payee')).flatMap(r => ['a_long_method_one', 'a_long_method_two', 'a_long_method_three'].map(m => ({ receiver: r, method: m })))];
+  assert.equal(callsFitRow(wide(receivers), receivers.length), false, 'the wide list does not fit');
+  const keep = fittingShops(receivers, wide);
   assert.ok(keep.length >= 1 && keep.length < receivers.length, 'it found a smaller list');
-  assert.equal(callsFitRow(build(keep), keep.length), true, 'the suggested list fits');
+  assert.equal(callsFitRow(wide(keep), keep.length), true, 'the suggested list fits');
   // Toll, Guard and House each need their own call, so they survive a trim before a plain payee.
   assert.ok(keep.includes('toll.nearcarta.near'));
   assert.ok(keep.includes('guard.nearcarta.near'));
@@ -114,7 +120,10 @@ test('the fail row could not hold what the page sent, and the new default can', 
   );
   assert.equal(eleven.length, 11);
   assert.equal(bytesOf(eleven), 601, 'the exact list the chain refused');
-  assert.equal(callsFitRow(eleven, six.length), false, 'the chain refused exactly this');
+  // The old 2000-byte board refused exactly this (budget 366 for six receivers)...
+  assert.ok(bytesOf(eleven) > 2000 - 1490 - 24 * six.length, 'the old board refused exactly this');
+  // ...and the live 4000-byte board holds it.
+  assert.equal(callsFitRow(eleven, six.length), true);
   // The default list the page now sends: two live shops, seven pairs.
   const defaults = [MAIN.toll?.contract, HOUSE_SHOP].filter(Boolean);
   const calls = build(defaults);
