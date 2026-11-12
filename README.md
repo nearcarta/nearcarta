@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml)
 
-<!-- # 1074 backend unit tests (1073 pass, 1 skipped) -->
+<!-- # 1087 backend unit tests (1086 pass, 1 skipped) -->
 
 ## The game
 
@@ -107,7 +107,7 @@ Status: live. The nine keepers form the market council on chain (quorum 5). Each
 | Play the whole day | Coins, a purse, a stall, a share. No wallet popup, no hash, no gas prompt in the main flow |
 | Tap the purse in the top bar | The Receipt: each finished step, and a quiet **Record** link to its real mainnet transaction for those who want proof |
 
-Status: sponsored gas is live. Each real move is signed by the player and sent by relayer.nearcarta.near, which pays the gas within caps per visitor and per day. In the prod run above, the player's NEAR stayed at 0.003 from the first move to the last ([2TXeZ4hR…](https://nearblocks.io/txns/2TXeZ4hRu2EB4zw9cG6zdq9jgfswKRQs6BwRu1K1uPRM) gather, sell, stall, invest). Email sign-in (Privy) is built and is being confirmed with a real inbox. Judges: every proof is on `/judge`.
+Status: sponsored gas is live. Each real move is signed by the player and sent by relayer.nearcarta.near, which pays the gas within caps per visitor and per day. In the prod run above, the player's NEAR stayed at 0.003 from the first move to the last ([2TXeZ4hR…](https://nearblocks.io/txns/2TXeZ4hRu2EB4zw9cG6zdq9jgfswKRQs6BwRu1K1uPRM) gather, sell, stall, invest). Google sign-in (Privy) on /setup plays the same account in Market Day, with no popup. Judges: every proof is on `/judge`.
 
 
 ### Try free: a guest account on the test network
@@ -224,7 +224,7 @@ The message to sign is not reproduced by hand: `call_as_message` is an exposed v
 
 ```bash
 npm ci
-npm test                 # 1074 unit tests (1073 pass, 1 skipped)
+npm test                 # 1087 unit tests (1086 pass, 1 skipped)
 npm run verify:mainnet   # 205/205 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run build
@@ -247,7 +247,7 @@ cd contracts/arena && cargo +1.95.0 test --lib  # 17 passed
 
 `CI` (`.github/workflows/ci.yml`) runs the backend units, the proof verify, the build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks. `npm run test:contracts` runs the sandbox suites locally against `near-sandbox`, with no keys.
 
-# 1074 unit tests (1073 pass, 1 skipped):
+# 1087 unit tests (1086 pass, 1 skipped):
 Proof rows (205/205 expected).
 
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
@@ -410,7 +410,7 @@ Tests: `cancel and expire are owner-only and never travel with the agent`, `/set
 
 ```bash
 npm ci
-npm test                 # 1074 unit tests (1073 pass, 1 skipped)
+npm test                 # 1087 unit tests (1086 pass, 1 skipped)
 npm run verify:mainnet   # 205/205 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run readme-numbers -- --check   # the counts in this file are current

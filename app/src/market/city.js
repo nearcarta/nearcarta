@@ -29,6 +29,15 @@ const GT = {
   GUEST_STEPS: ['cargo', 'sell', 'invest', 'seal', 'pay', 'order', 'cross', 'check', 'write'],
   async step(id, ctx) { return (await guestReady()).step(id, ctx); },
   async history() { return (await guestReady()).history(); },
+  /** This guest's own testnet moves, read from localStorage (no bundle). Older guests' rows are left out. */
+  txs() {
+    try {
+      const me = JSON.parse(globalThis.localStorage?.getItem('nearcarta.guest.v1') || 'null')?.account;
+      const all = JSON.parse(globalThis.localStorage?.getItem('nearcarta.guest.play.v1') || '{}').txs || [];
+      return me ? all.filter((t) => t.hash && t.net === 'testnet' && t.account === me) : [];
+    } catch { return []; }
+  },
+  account() { try { return JSON.parse(globalThis.localStorage?.getItem('nearcarta.guest.v1') || 'null')?.account || ''; } catch { return ''; } },
 };
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -41,6 +50,14 @@ const NAME = { arena: 'Vault Arena', hall: 'Town Hall', ferry: 'Ferry', toll: 'T
 const GOOD = (g) => S.GOODS[g]?.name || S.ITEMS[g]?.name || (g.startsWith('share:') ? `${NAME[g.slice(6)] || g.slice(6)} share` : g);
 // Plain game words: the purse counts coins (1 coin = 0.0001 NEAR). The chain shows only in the Receipt.
 const coins = (y) => { const t = (BigInt(y) * 10n) / Q.COIN; const w = t / 10n, f = t % 10n; return f ? `${w}.${f}` : `${w}`; };
+/** Coins rounded to `d` decimals (trailing zeros kept so two prices line up). */
+const coinsAt = (y, d) => { const m = 10n ** BigInt(d); const t = (BigInt(y) * m + Q.COIN / 2n) / Q.COIN; return d ? `${t / m}.${String(t % m).padStart(d, '0')}` : `${t}`; };
+/** "1.2000 → 1.1964": the fewest decimals (1 to 6) that show the two prices differ. */
+export function priceMove(before, after) {
+  const b = BigInt(before), a = BigInt(after);
+  let d = 1; while (d < 6 && coinsAt(b, d) === coinsAt(a, d)) d++;
+  return { text: `${coinsAt(b, d)} → ${coinsAt(a, d)}`, down: a < b, same: a === b };
+}
 const near = (y) => { const s = yoctoToNear(String(y)); const [a, b = ''] = s.split('.'); return b ? `${a}.${b.slice(0, 4).padEnd(4, '0')}` : `${a}.0000`; };
 
 // ---------- state (practice) ----------
@@ -231,7 +248,7 @@ function stripHtml(id) {
   if (lastDone && lastDone.shop === id) {
     const r = lastDone.res, nx = Q.current(city);
     let sub = receiptLine(lastDone.step, r);
-    if (lastDone.step.id === 'sell') sub = `+${coins(r.total)} coins · price ${coins(r.before)} → ${coins(r.after)}<br>Your sale pushed the price down: the shelf has more salt now.<br>${receiptLine(lastDone.step, r)}`;
+    if (lastDone.step.id === 'sell') { const pm = priceMove(r.before, r.after); sub = `+${coins(r.total)} coins · price ${pm.text}<br>${pm.down ? 'Your sale pushed the price down: the shelf has more salt now.' : 'The price held: the shelf took your salt without moving.'}<br>${receiptLine(lastDone.step, r)}`; }
     if (lastDone.step.id === 'invest' && r.real?.saving) sub = `The city’s demo purse is saving up: ${coins(BigInt(r.real.have || 0))} of 10 coins for its next share<br><span class="qs-chip">Practice, no spend</span>`;
     else if (lastDone.step.id === 'invest') sub = `${r.real?.demo ? '1 Ferry share bought by the demo purse for 10 coins (0.001 NEAR)' : '1 Ferry share for 10 coins (0.001 NEAR) · it pays you a part of the Ferry’s sales'}<br>${receiptLine(lastDone.step, r)}`;
     const ex = (pf) => (pf ? ` · <a class="qs-proof" href="${pf.url}" target="_blank" rel="noopener">Example on chain ↗</a>` : '');
@@ -327,6 +344,7 @@ function vBag() {
 
 // The Receipt: the only place the chain shows. Quiet, for the curious and for judges.
 function vReceipt() {
+  if (GT.on()) return vGuestReceipt();
   const done = Q.STEPS.slice(0, Q.progress(city).done);
   const rows = done.map((x) => `<div class="md-row static"><span class="md-tok">${ICON.seal}</span><span class="md-nm"><b>${esc(NAME[x.shop])}</b><small>${esc(x.done)}</small></span>${x.proof ? `<a class="md-ghost sm" href="${x.proof.url}" target="_blank" rel="noopener" title="${esc(x.proof.label)}">Record ↗</a>` : ''}</div>`).join('');
   const txs = R.on() ? (R.live.txs || []) : [];
@@ -336,6 +354,18 @@ function vReceipt() {
     + (rows ? `<div class="md-list">${rows}</div>` : '<p class="md-hint">Nothing yet. Your first stop is the Town Hall.</p>')
     + (R.on() ? `<p class="md-hint">Real round as ${esc(R.live.account.slice(0, 8))}…: market moves are mainnet transactions from your wallet, gas paid by the city. Other steps link the recorded transaction of the same action. 1 coin = 0.0001 NEAR. All proofs: <a href="/judge">/judge</a>.</p>`
       : '<p class="md-hint">Practice round: the city’s rules run here. Each Record is a real mainnet transaction of the same action. 1 coin = 0.0001 NEAR. All proofs: <a href="/judge">/judge</a>.</p>');
+}
+/** Testnet: only this guest's own testnet transactions, in testnet words. No mainnet rows or links. */
+function vGuestReceipt() {
+  const done = Q.STEPS.slice(0, Q.progress(city).done);
+  const txs = GT.txs();
+  const real = txs.map((t) => `<div class="md-row static"><span class="md-tok">${ICON.coin}</span><span class="md-nm"><b>${esc(t.what || t.step)}</b><small>${esc(t.hash.slice(0, 10))}…</small></span><a class="md-ghost sm" href="${txUrl(encodeURIComponent(t.hash))}" target="_blank" rel="noopener">Tx ↗</a></div>`).join('');
+  const rows = done.map((x) => `<div class="md-row static"><span class="md-tok">${ICON.seal}</span><span class="md-nm"><b>${esc(NAME[x.shop])}</b><small>${esc(x.done)}</small></span></div>`).join('');
+  const who = GT.account();
+  return head(ICON.seal, 'Receipt', `${purse()} coins · ${done.length}/9 steps`)
+    + (real ? `<h3 class="md-sub">Your moves on the NEAR test network</h3><div class="md-list" data-testid="md-guest-txs">${real}</div>` : '')
+    + (rows ? `<div class="md-list">${rows}</div>` : '<p class="md-hint">Nothing yet. Your first stop is the Town Hall.</p>')
+    + `<p class="md-hint" data-testid="md-guest-note">Free round as ${esc(who.slice(0, 10))}…: every move is a testnet transaction from this guest account, gas paid by the city's testnet relayer. Test NEAR has no value. 1 coin = 0.0001 test NEAR. All proofs: <a href="/judge">/judge</a>.</p>`;
 }
 function mood(sh) { if (!S.isOpen(sh)) return ['Worried', 'The till is under the floor. The shop is dark.']; if (sh.till >= sh.floor * 2n) return ['Cheerful', 'A full till and steady trade.']; return ['Steady', 'Enough in the till to trade.']; }
 function vKeeper() {

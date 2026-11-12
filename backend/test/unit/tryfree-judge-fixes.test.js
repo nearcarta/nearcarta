@@ -18,12 +18,12 @@ test('the first-visit tour never covers the town front door', () => {
 
 test('the guest top-up sells only what the bag holds', () => {
   const g = read('app/src/market/live-guest.js');
-  const top = g.slice(g.indexOf('async function topUpPurse'), g.indexOf('const saltInBag'));
-  assert.match(top, /let salt = await saltInBag\(\)/);
-  assert.match(top, /const qty = Math\.min\(3, salt\)/);
-  assert.match(top, /if \(salt < 1\) continue;/);
+  const top = g.slice(g.indexOf('async function topUpPurse'), g.indexOf('const goodInBag'));
+  assert.match(top, /let bag = await goodInBag\(good\)/);
+  assert.match(top, /const qty = Math\.min\(bag, Math\.max\(1, need\)\)/);
+  assert.match(top, /if \(bag < 1\) continue;/);
   assert.doesNotMatch(top, /qty: 3,/, 'never a fixed 3');
-  assert.match(g, /async function waitForSalt\(want, ms = 9000\)/);
+  assert.match(g, /async function waitForGood\(good, want, ms = 9000\)/);
   const sell = g.slice(g.indexOf("if (id === 'sell')"), g.indexOf("if (id === 'invest')"));
   assert.match(sell, /await waitForSalt\(3\)/);
 });

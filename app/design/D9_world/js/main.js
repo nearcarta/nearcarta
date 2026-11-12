@@ -214,7 +214,7 @@ const typing=e=>e.target.closest&&e.target.closest('input,textarea,select,[conte
 addEventListener('nearcarta:typing',()=>keys.clear());
 addEventListener('keydown',e=>{ if(typing(e)) return; const k=e.key.toLowerCase(); if(e.target.closest&&e.target.closest('button,input,textarea')&&k==='enter') return;
   if(KM[k]){ e.preventDefault(); if(inShop) return; if(mode!=='explore') explore(true); if(play!=='walk') setPlay('walk'); keys.add(k); body.classList.add('moved'); }
-  if((k==='='||k==='+')&&!inShop){ setZoom(PC.z-.12); } if((k==='-'||k==='_')&&!inShop){ setZoom(PC.z+.12); } if(k==='o'&&!inShop){ setZoom(PC.z>.7?.14:1); }
+  if((k==='='||k==='+')&&!inShop){ setZoom(PC.z-.12); } if((k==='-'||k==='_')&&!inShop){ setZoom(PC.z+.12); } if((k==='o'||k==='0')&&!inShop){ setZoom(PC.z>.7?.14:1); }
   if(k==='shift') R.steerRun=true;
   if(k==='enter'&&mode==='explore'&&near&&!inShop){ e.preventDefault(); goIn(near); }
   if(/^[1-9]$/.test(e.key)&&!(e.target.closest&&e.target.closest('input,textarea,select'))){ const ids=Object.keys(OPEN); const id=ids[Number(e.key)-1]; if(id){ e.preventDefault(); jump(id); } }
@@ -336,6 +336,9 @@ function pick(e){ const r=cv.getBoundingClientRect(); ndc.set((e.clientX-r.left)
   for(const h of hits){ const id=h.object.userData.id; if(!id||!SHOPS[id]||seen.has(id)) continue; seen.add(id); const c=hx(SHOPS[id].q,SHOPS[id].r); const d=(c.x-groundPt.x)**2+(c.z-groundPt.z)**2; if(d<bd){ bd=d; best=id; } }
   return best||hits[0].object.userData.id; }
 cv.addEventListener('pointerdown',e=>{ down={x:e.clientX,y:e.clientY,yaw:PC.yaw,po:PC.po,t:performance.now()}; });
+// A press that ends off the canvas (on a HUD pill, outside the window) never reaches the canvas pointerup and
+// left `down` set, so hover tags stopped for good. Clear it wherever the press ends.
+addEventListener('pointerup',e=>{ if(e.target!==cv) down=null; },true); addEventListener('pointercancel',()=>{ down=null; },true); addEventListener('blur',()=>{ down=null; });
 cv.addEventListener('pointermove',e=>{ if(down&&mode==='explore'&&Math.hypot(e.clientX-down.x,e.clientY-down.y)>6){ PC.yaw=down.yaw-(e.clientX-down.x)*.006; PC.po=Math.max(-.1,Math.min(.3,down.po+(e.clientY-down.y)*.003)); tagOff(); return; } if(mode==='story'||down||inShop) return; hover(e); });
 cv.addEventListener('pointerup',e=>{ const d=down; down=null; if(inShop) return; if(!d||Math.hypot(e.clientX-d.x,e.clientY-d.y)>6) return; if(storyEnd>d.t-80) return; if(mode!=='explore') explore(true);
   sm.hidden=true; const kp=keeperAt(e); if(kp){ kp.lookAt(R,1); dispatchEvent(new CustomEvent('world:keeper-tap',{detail:{id:kp.keeper||'ferry',name:kp.name}})); return; }
@@ -479,7 +482,10 @@ function frame(now){ if(stopped) return; const gap=sheetOpen()?4000:(shopFieldFo
 
 // first frame is the town; the story starts on it
 // ---------- landing: after the intro the camera frames the plaza, the Lamplighter in front, two or three shop fronts behind ----------
-function land(){ explore(true); const z=.16; PC.z=PC.zs=z; setZoom(z); PC.po=.04; PC.yaw=Math.atan2(R.pos.x-ZC.x,R.pos.z-ZC.z); }
+// The story ends on the town view where the shop pins show (pins fade in from z .42, full at .62), easing out
+// from the street. Ending at street level left a visitor with no names and no idea where to click.
+const LAND_Z=.66;
+function land(){ explore(true); PC.zs=.16; setZoom(LAND_Z); PC.po=.04; PC.yaw=Math.atan2(R.pos.x-ZC.x,R.pos.z-ZC.z); }
 // ---------- "Set your agent's rules": the Charter office is Your House. Fly to its door, open it, and go in under the fade ----------
 const SETUP='/setup/';
 const ready=()=>{ try{ return !!JSON.parse(localStorage.getItem('nearcarta.setup.v1')||'{}').charter; }catch{ return false; } };

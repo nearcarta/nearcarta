@@ -17,11 +17,14 @@ import {
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const near = (y) => { try { return (Number(BigInt(y) / 10n ** 18n) / 1e6).toFixed(3); } catch { return ''; } };
 
+/** The badge's hint. It is drawn by CSS under the badge, right-aligned, so it never runs off the right edge
+ * the way the native `title` tooltip did at the top-right corner. */
+export const badgeTip = (test) => (test ? 'You are playing on the NEAR test network. Nothing here is real money.' : 'You are on NEAR mainnet, where payments are real.');
 /** The badge: one teal TESTNET pill or one gold MAINNET pill, in the top bar. */
 export function badgeMarkup() {
   const test = NET === 'testnet';
   return `<button id="netBadge" class="net-badge ${test ? 'test' : 'main'}" type="button" data-testid="net-badge"
-    aria-haspopup="dialog" title="${test ? 'You are playing on the NEAR test network. Nothing here is real money.' : 'You are on NEAR mainnet, where payments are real.'}">
+    aria-haspopup="dialog" data-tip="${badgeTip(test)}" aria-description="${badgeTip(test)}">
     <span class="dot" aria-hidden="true"></span>${networkLabel()}</button>`;
 }
 
