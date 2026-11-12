@@ -1109,3 +1109,43 @@ body.in-shop .net-pitch,body.story .net-pitch{display:none}
 .net-chrome .btn-quiet{display:inline-flex;align-items:center;height:34px;padding:0 10px;border-radius:17px;font:500 13px var(--sans);color:var(--parch2);text-decoration:none;background:transparent;border:0;cursor:pointer}
 .net-chrome .btn-quiet:hover{color:var(--parch);text-decoration:underline}
 @media (max-width:720px){ .net-chrome .btn-quiet{height:30px;font-size:12px} }
+
+/* The scam errand, on the front door. It is a card in the town's own chrome, not a shop panel, so a
+   visitor meets it before walking anywhere. Hidden until app/src/net/scam.js fills it. */
+.scam-host{position:fixed;left:16px;right:16px;bottom:calc(96px + env(safe-area-inset-bottom,0px));z-index:150;display:flex;justify-content:center;pointer-events:none}
+.scam-host[hidden]{display:none}
+.scam{pointer-events:auto;width:min(560px,100%);background:rgba(24,19,14,.96);color:var(--parch);border:1px solid #c98f4e;border-radius:16px;padding:16px 18px;box-shadow:0 18px 48px rgba(0,0,0,.5);font:500 13.5px/1.55 var(--sans);max-height:min(70vh,560px);overflow:auto}
+.scam h2{margin:0 0 6px;font:600 17px var(--serif)}
+.scam .scam-intro{margin:0 0 10px;font-size:12.5px;color:var(--parch2)}
+.scam .scam-lab{display:block;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--parch3);margin-bottom:4px}
+.scam textarea{width:100%;box-sizing:border-box;background:rgba(10,7,5,.7);color:var(--parch);border:1px solid rgba(214,180,106,.4);border-radius:10px;padding:8px 10px;font:500 13.5px/1.5 var(--sans);resize:vertical}
+.scam .scam-examples{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px}
+.scam .scam-eg{background:none;border:1px dashed rgba(214,180,106,.45);color:var(--parch2);border-radius:12px;padding:3px 9px;font:500 11.5px var(--sans);cursor:pointer;text-align:left}
+.scam .scam-eg:hover{color:var(--parch);border-style:solid}
+.scam .btn-gold,.scam .btn-outline{display:inline-flex;align-items:center;height:38px;border-radius:19px;padding:0 16px;font:600 13.5px var(--sans);cursor:pointer;margin:0 6px 6px 0}
+.scam .btn-gold{background:linear-gradient(180deg,#f5d08a,#d9a24c);color:#221a10;border:1px solid #b3823c}
+.scam .btn-outline{background:transparent;color:var(--parch);border:1px solid #d6b46a}
+.scam .btn-gold[disabled],.scam .btn-outline[disabled]{opacity:.5;cursor:not-allowed}
+/* The forced-submit button is hidden until a refusal has been anchored: `display:inline-flex` above would
+   otherwise beat the plain `hidden` attribute. */
+.scam [hidden]{display:none!important}
+.scam .scam-note{font-size:12.5px;color:var(--parch2);min-height:1.1em;margin:4px 0}
+.scam .scam-reply{border-left:2px solid #c98f4e;padding-left:10px;margin:8px 0}
+.scam .scam-said{margin:0 0 4px;font:500 14px/1.5 var(--serif)}
+.scam .scam-seal,.scam .scam-tee,.scam .scam-digest{margin:2px 0;font-size:12px;color:var(--parch2)}
+.scam .scam-receipts{display:grid;gap:5px;margin:8px 0}
+.scam .scam-row{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;font-size:12.5px}
+.scam .scam-row.ok{border-left:2px solid #42d6bf;padding-left:8px}
+.scam .scam-row.failed{border-left:2px solid #ff6b6b;padding-left:8px}
+.scam .scam-row small{opacity:.75}
+.scam a{color:#f5d08a}
+.scam .pc-ok{color:#42d6bf}
+.scam .pc-bad{color:#ff6b6b}
+@media (max-width:720px){
+  /* On a phone the gold rule CTA sits at the bottom, so the errand stacks above it and never covers it.
+     At 390 the card is 434px tall and the CTA occupies the last ~120px, so 152px of clearance plus a
+     scrollable body keeps the card's own buttons reachable without hiding the town's. */
+  .scam-host{bottom:calc(152px + env(safe-area-inset-bottom,0px));left:8px;right:8px}
+  .scam{padding:12px 14px;max-height:min(48vh,380px)}
+  .scam .btn-gold,.scam .btn-outline{width:100%;justify-content:center}
+}

@@ -27,3 +27,21 @@ test('the guest and wallet bundles are not downloaded on first load', async ({ p
   expect(seen.some((u) => /live-guest\.js/.test(u)), 'the guest bundle is lazy').toBe(false);
   expect(seen.some((u) => /house\.bundle\.js/.test(u)), 'the wallet bundle is lazy').toBe(false);
 });
+
+test('the market and the errand are ready together on a slow phone', async ({ page }) => {
+  // The brief's budget: the market loads and a guest could act in under 5 s. Throttle to a mid-range phone
+  // on a slow link, which is the honest reading of that budget.
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Network.enable');
+  await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 150, downloadThroughput: (1.6 * 1024 * 1024) / 8, uploadThroughput: (750 * 1024) / 8 });
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+  const t0 = Date.now();
+  await page.goto('/?mode=2d&net=testnet');
+  // Both front-door beats: the Market Day entry and the scam errand.
+  await expect(page.getByTestId('md-enter')).toBeAttached({ timeout: 20_000 });
+  const marketMs = Date.now() - t0;
+  await expect(page.getByTestId('scam-errand')).toBeVisible({ timeout: 20_000 });
+  const errandMs = Date.now() - t0;
+  expect(marketMs, `the market took ${marketMs} ms on a throttled phone`).toBeLessThan(5000);
+  expect(errandMs, `the errand took ${errandMs} ms on a throttled phone`).toBeLessThan(5000);
+});

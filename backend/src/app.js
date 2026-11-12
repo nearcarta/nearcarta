@@ -35,6 +35,7 @@ import * as tee from './tee.js';
 import * as vault from './vault.js';
 import * as relayer from './relayer.js';
 import * as guestRoutes from './guest-routes.js';
+import * as scamRoutes from './scam-routes.js';
 import * as marketGuide from './market-guide.js';
 import * as marketLive from './market-live.js';
 import * as marketHistory from './market-history.js';
@@ -968,6 +969,7 @@ export function makeApp() {
   vault.register(app, { limiter, globalCap });
   relayer.register(app, { limiter, globalCap });
   guestRoutes.register(app, { limiter, globalCap });
+  scamRoutes.register(app, { limiter, globalCap });
   bankSeal.register(app, { limiter, globalCap });
   merchant.register(app, { limiter, globalCap });
   marketGuide.register(app, { limiter, globalCap });

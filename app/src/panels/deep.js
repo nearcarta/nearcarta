@@ -3,6 +3,7 @@
 
 import { API_PATH } from '../../../shared/net/net.js';
 import { roomError } from '../room-error.js';
+import { installProofCard } from '../shop-proof.js';
 import { pickBest, quoteLine, tokenChoices, chainsOf, filterTokens } from '../ferry-catalog.js';
 import { mountGuardTray } from './guard-tray.js';
 import { mountTollRoom } from './toll-room.js';
@@ -1110,6 +1111,9 @@ function installAgentSheetClose(root) {
 
 export function mountShop(id, root, hooks = {}) {
   if (!root) return;
+  // Every shop shows the same "What the chain saw" card, under its header, so a judge reads the same six
+  // facts wherever they are. It starts with nothing filled in and a shop fills it when it has a receipt.
+  try { installProofCard({ doc: root.ownerDocument || document }); } catch { /* a shop without a tray is fine */ }
   // One close control for every shop's agent sheet. Each shop builds its own popup, so adding a
   // button to nine files would be nine chances to diverge: this attaches to whichever
   // [id$='-agent-pop'] the shop rendered, and gives it a real button (the CSS ::before was a

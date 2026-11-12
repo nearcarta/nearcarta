@@ -63,7 +63,7 @@ const D = {
 };
 
 /** The chosen network's settings. `cfg.shops` is filled by `setShops` from the record. */
-export const cfg = { ...D[NET], net: NET };
+export const cfg = { ...D[NET], net: NET, scamLimit: null };
 
 /** Install the shop names and the guest row defaults for the chosen network, from the record. */
 export function setShops(shops = {}, guestRow = null) {
@@ -171,6 +171,7 @@ try {
     board: cfg.shops.board || (NET === 'testnet' ? 'board.nearcarta.testnet' : 'board.nearcarta.near'),
     shops: cfg.shops,
     guestRow: cfg.guestRow,
+    scamLimit: cfg.scamLimit || null,
     txUrl,
     addrUrl,
     api,

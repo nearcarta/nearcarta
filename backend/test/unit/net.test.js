@@ -85,7 +85,7 @@ const PROOF_ONLY = new Set(['app/src/judges-data.js', 'app/src/llms.txt']);
 // A proof-only file may name a mainnet hash link, but must not fetch the API by hand.
 const API_OK = new Set(['app/design/D8_shops/data/live.js', 'app/design/D6_dashboards/src/data.js',
   'app/design/D8_shops/js/apps.js', 'app/design/D8_shops/shops/_ui.js', 'app/design/D8_shops/shops/tollrecords.js',
-  'app/design/D9_world/js/main.js', 'app/src/panels/guard-tray.js']);
+  'app/design/D9_world/js/main.js', 'app/src/panels/guard-tray.js', 'app/src/shop-proof.js']);
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {

@@ -23,6 +23,7 @@ const OWNERS = [
   /^guest\/key\.js$/,
   /^market\/live-guest\.js$/,
   /^judges-run\.js$/,
+  /^net\/scam\.js$/,
   /^shared\/deployments\/testnet\.json$/,
 ];
 
