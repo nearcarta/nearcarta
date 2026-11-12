@@ -225,7 +225,7 @@ The message to sign is not reproduced by hand: `call_as_message` is an exposed v
 ```bash
 npm ci
 npm test                 # 1061 unit tests (1060 pass, 1 skipped)
-npm run verify:mainnet   # 108/108 mainnet txs found
+npm run verify:mainnet   # 205/205 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run build
 npm run e2e   # 127 browser tests
@@ -238,7 +238,7 @@ cd contracts/arena && cargo +1.95.0 test --lib  # 17 passed
 | Command | What it prints | What it proves |
 |---|---|---|
 | `npm test` | `# pass 898`, `# fail 0`, `# skipped 1` | The unit suites, offline. The one skip would sign a real transaction |
-| `npm run verify:mainnet` | `108/108 mainnet txs found`, then rewrites `judges/proofs/mainnet-proof-check.json` | Every proof transaction in `shared/deployments/mainnet.json` exists on mainnet, allowed or refused |
+| `npm run verify:mainnet` | `205/205 mainnet txs found`, then rewrites `judges/proofs/mainnet-proof-check.json` | Every proof transaction in `shared/deployments/mainnet.json` exists on mainnet, allowed or refused |
 | `npm run check-cited` | `MISSES: none` | Every file, account, code hash and sha256 this README, `judges/VERIFY.md` and the live `/api/deployments` name resolves |
 | `npm run build && npm run e2e` | Playwright, writing `judges/proofs/e2e-results.json` | The town, the shops and `/setup` in a real browser |
 | `cargo +1.95.0 test --lib` in `contracts/oath` | `122 passed` | The charter's own logic. `+1.95.0` is required: the crate needs edition2024 |
@@ -248,7 +248,7 @@ cd contracts/arena && cargo +1.95.0 test --lib  # 17 passed
 `CI` (`.github/workflows/ci.yml`) runs the backend units, the proof verify, the build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks. `npm run test:contracts` runs the sandbox suites locally against `near-sandbox`, with no keys.
 
 # 1061 unit tests (1060 pass, 1 skipped):
-Proof rows (108/108 expected).
+Proof rows (205/205 expected).
 
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
 `contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. `contracts/charter_board` is the live visitor board. `contracts/arena` holds 17.
@@ -411,7 +411,7 @@ Tests: `cancel and expire are owner-only and never travel with the agent`, `/set
 ```bash
 npm ci
 npm test                 # 1061 unit tests (1060 pass, 1 skipped)
-npm run verify:mainnet   # 108/108 mainnet txs found
+npm run verify:mainnet   # 205/205 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run readme-numbers -- --check   # the counts in this file are current
 npm run start            # API on :8787
