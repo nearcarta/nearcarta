@@ -78,7 +78,13 @@ root.id = 'marketday';
 root.innerHTML = `
 <button class="md-enter" type="button" data-testid="md-enter"><span class="i">${ICON.play}</span><span>Market Day</span></button>
 <div class="md-hud" role="status" aria-live="polite" data-testid="md-hud">
-  <div class="md-day" title="Market Day: one step at each shop"><span class="i" data-k="phase"></span><span class="md-dots" data-k="dots"></span><b data-k="prog"></b></div>
+  <div class="md-day" title="Market Day: one step at each shop"><span class="i" data-k="phase"></span><span class="md-dots" data-k="dots"></span><b data-k="prog"></b>
+    <!-- Progress a player can feel: a ring that fills, the step count, and the reward at the end. -->
+    <span class="md-ring" data-k="ring" data-testid="md-ring" role="img" aria-label="Day progress">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="9" class="bg"/><circle cx="12" cy="12" r="9" class="fg" data-k="ringfg"/></svg>
+    </span>
+    <span class="md-reward" data-k="reward" data-testid="md-reward" hidden></span>
+  </div>
   <button type="button" class="md-purse" data-v="receipt" data-testid="md-receipt" aria-label="Purse and receipt"><span class="i" data-k="pi">${ICON.coin}</span><b data-k="near"></b></button>
   <button type="button" class="md-exit" data-testid="md-exit" aria-label="Leave Market Day"><span class="i">${ICON.close}</span></button>
 </div>
@@ -104,6 +110,14 @@ const WHY = {
 };
 const fail = (e) => toast(WHY[e.code] || e.message, 'no');
 
+// The reward a finished day pays, said in words: what you keep and what the day proved. Practice, the
+// demo purse and a guest all end here; only the receipt line under it differs.
+const REWARD_LINE = () => {
+  const st = Q.state(city);
+  const coinsEarned = Q.STEPS.length * Q.COIN;
+  return `you keep ${coins(coinsEarned)} coins${st.toll ? ` after ${coins(st.toll)} toll` : ''}${GT.on() ? ' · every step is a testnet receipt' : ''}`;
+};
+
 // ---------- HUD ----------
 const PH = { dawn: 'dawn', market: 'sun', dusk: 'dusk', night: 'night' };
 let lastPhase = null;
@@ -116,6 +130,15 @@ function hud() {
   K('phase').innerHTML = ICON[PH[c.phase]];
   K('dots').innerHTML = Q.STEPS.map((s, i) => `<i class="${i < pr.done ? 'done' : i === pr.done ? 'now' : ''}" title="${esc(NAME[s.shop])}"></i>`).join('');
   K('prog').textContent = `${pr.done}/${pr.total}`;
+  // The ring fills with the day; a finished day shows the reward instead of a count.
+  const ring = K('ringfg');
+  if (ring) { const C = 2 * Math.PI * 9; ring.setAttribute('stroke-dasharray', String(C)); ring.setAttribute('stroke-dashoffset', String(C * (1 - Math.min(1, pr.done / pr.total)))); }
+  const reward = K('reward');
+  if (reward) {
+    const done = pr.done >= pr.total;
+    reward.hidden = !done;
+    reward.innerHTML = done ? `${ICON.seal} <b>Day ${Q.state(city).day} sealed</b> <small>${REWARD_LINE()}</small>` : '';
+  }
   K('near').textContent = purse();
   K('pi').innerHTML = Q.state(city).sealed ? ICON.seal : ICON.coin;
   const n = Object.entries(p.bag).filter(([g]) => !g.startsWith('share:')).reduce((a, [, v]) => a + v, 0);

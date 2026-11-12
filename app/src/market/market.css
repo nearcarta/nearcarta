@@ -268,3 +268,15 @@ body.md-play.qs-on #tray #t-src { display: none !important; }
 /* The TESTNET pill on a real guest step. Teal, small, and never hidden: a judge must be able to tell a
    testnet receipt from a mainnet one at a glance, on the card itself. */
 .qs-net-pill{display:inline-flex;align-items:center;height:17px;padding:0 6px;margin-right:6px;border-radius:9px;background:rgba(9,42,40,.9);color:#7fe3d4;border:1px solid #2f9a8c;font:700 9.5px var(--sans,Inter,system-ui,sans-serif);letter-spacing:.09em;vertical-align:1px;white-space:nowrap}
+
+/* Progress you can feel. The ring fills with the day, the count is already there, and a finished day
+   swaps both for the reward line. Small enough for the 390px HUD. */
+.md-ring{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;flex:0 0 22px}
+.md-ring svg{display:block;transform:rotate(-90deg)}
+.md-ring circle{fill:none;stroke-width:3}
+.md-ring .bg{stroke:rgba(245,208,138,.16)}
+.md-ring .fg{stroke:#f5d08a;stroke-linecap:round;transition:stroke-dashoffset .5s ease}
+.md-reward{display:inline-flex;align-items:baseline;gap:6px;flex-wrap:wrap;font:600 12.5px Inter,system-ui,sans-serif;color:#f5d08a}
+.md-reward .i{width:14px;height:14px}
+.md-reward small{font-weight:500;font-size:11.5px;color:var(--md-cream,#f3ead8);opacity:.8}
+@media (max-width:720px){ .md-ring{width:18px;height:18px;flex-basis:18px} .md-reward small{display:none} }
