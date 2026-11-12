@@ -7,7 +7,7 @@ import { agentCargoPlan, parseAgentFerry, receiveConfirm } from '../../../app/sr
 import { ferryMarkup } from '../../../app/src/panels/deep.js';
 import { runFerryAgent } from '../../../app/src/panels/deep.js';
 import {
-  agentDeliveredNote, boardCallText, cityCheckoutBody, depositPlan, destExplorer, explainQuoteMiss, ferryStatusHtml, ferryStatusView, mayCheckout, nearAmount, newestReceipt, nextFerryBeat, pickWrapSpend, PROPOSE_CALL_BYTES, proposeCallPrepaidYocto, proposeCallTgas, quoteRecipient, SESSION_SWAP, stepsAllowanceYocto, validateDestAddress, WRAP, WRAP_STORAGE_YOCTO, wrapDepositYocto, wrapProgressNote,
+  agentDeliveredNote, boardCallText, rowFit, cityCheckoutBody, depositPlan, destExplorer, explainQuoteMiss, ferryStatusHtml, ferryStatusView, mayCheckout, nearAmount, newestReceipt, nextFerryBeat, pickWrapSpend, PROPOSE_CALL_BYTES, proposeCallPrepaidYocto, proposeCallTgas, quoteRecipient, SESSION_SWAP, stepsAllowanceYocto, validateDestAddress, WRAP, WRAP_STORAGE_YOCTO, wrapDepositYocto, wrapProgressNote,
 } from '../../../app/src/panels/ferry-settle.js';
 import { functionCallAllowanceCost } from '../../../shared/board/cost.js';
 import { GAS_TOPUP_YOCTO } from '../../../shared/board/session.js';
@@ -465,42 +465,82 @@ test('unregistered board near_deposit attaches transfer plus wrap storage', () =
   assert.equal(ft.amount, transfer);
 });
 
-test('stranded board wNEAR skips near_deposit and transfers the exact balance', () => {
-  const stranded = '48750000000000000000000';
-  assert.equal(nearAmount(stranded), '0.04875');
-  const pick = pickWrapSpend({ wantAmount: '0.05', wrapBalanceYocto: stranded });
-  assert.equal(pick.recover, true);
-  assert.equal(pick.amount, '0.04875');
-  assert.equal(pick.amountYocto, stranded);
+test('board wNEAR is never reused: every plan wraps the row\'s own NEAR first', () => {
+  // The board is the predecessor of every propose_call, so all rows share one wrap.near
+  // balance. Reusing it let a row spend wNEAR another row (or the board) had deposited.
+  const shared = '5000000000000000000000';
+  const pick = pickWrapSpend({ wantAmount: '0.003', wrapBalanceYocto: shared });
+  assert.equal(pick.recover, false);
+  assert.equal(pick.amount, '0.003');
+  assert.equal(pick.amountYocto, '3000000000000000000000');
   const plan = depositPlan({
     from: 'wNEAR@near', amount: pick.amount, depositAddress: 'cd'.repeat(32),
-    capYocto: '60000000000000000000000', balanceYocto: '13750000000000000000000',
-    wrapRegistered: true, wrapBalanceYocto: stranded,
+    capYocto: '5000000000000000000000', balanceYocto: '13750000000000000000000',
+    wrapRegistered: true, wrapBalanceYocto: shared, depositAccountRegistered: true,
   });
   assert.equal(plan.kind, 'propose_call');
-  assert.equal(plan.recover, true);
-  assert.deepEqual(plan.steps.map(s => s.method), ['storage_deposit', 'ft_transfer']);
-  assert.equal(JSON.parse(plan.steps[1].args).amount, stranded);
-  const sum = plan.steps.reduce((n, s) => n + BigInt(s.deposit), 0n);
-  assert.ok(sum <= 13750000000000000000000n);
-  const registeredDeposit = depositPlan({
-    from: 'wNEAR@near', amount: pick.amount, depositAddress: 'cd'.repeat(32),
-    capYocto: '60000000000000000000000', balanceYocto: '13750000000000000000000',
-    wrapRegistered: true, wrapBalanceYocto: stranded, depositAccountRegistered: true,
-  });
-  assert.deepEqual(registeredDeposit.steps.map(s => s.method), ['ft_transfer']);
-  assert.equal(registeredDeposit.steps[0].deposit, '1');
+  assert.equal(plan.recover, false);
+  assert.deepEqual(plan.steps.map(s => s.method), ['near_deposit', 'ft_transfer']);
+  assert.equal(plan.steps[0].deposit, '3000000000000000000000');
+  assert.equal(JSON.parse(plan.steps[1].args).amount, plan.steps[0].deposit, 'the transfer moves exactly what this row wrapped');
+  assert.equal(plan.steps[1].deposit, '1');
 });
 
-test('apps.js maps the wrap.near balance panic to stranded wNEAR copy', () => {
+test('apps.js and shopui.js never read the board wNEAR as the row\'s', () => {
   const apps = read('app/design/D8_shops/js/apps.js');
   assert.match(apps, /wrapBoardState/);
   assert.match(apps, /wrapStorageOf/);
-  assert.match(apps, /does not hold enough wNEAR/);
-  assert.match(apps, /stranded wNEAR/);
+  assert.match(apps, /wrap fresh NEAR from your row/);
+  assert.doesNotMatch(apps, /stranded wNEAR/);
+  assert.doesNotMatch(apps, /wrapBalanceYocto: wrap\.balanceYocto/);
   const ui = read('app/design/D8_shops/js/shopui.js');
-  assert.match(ui, /pickWrapSpend/);
-  assert.match(ui, /stranded wNEAR/);
+  assert.match(ui, /pickWrapSpend\(\{ wantAmount: pair\.amt \}\)/);
+  assert.doesNotMatch(ui, /stranded wNEAR/);
+  assert.doesNotMatch(ui, /wrapBalanceYocto/);
+  assert.match(ui, /row: liveRow/);
+  assert.match(ui, /rowRefusesWrap/);
+});
+
+test('rowFit checks the wrap in the board\'s order and names what would fit', () => {
+  const row = {
+    per_action_cap: '5000000000000000000000', daily_budget: '10000000000000000000000',
+    spent_today: '7100000000000000000000', max_actions_per_day: 20, actions_today: 8,
+    min_amount: '1', balance: '1700000000000000000000',
+  };
+  const steps = amt => depositPlan({
+    from: 'wNEAR@near', amount: amt, depositAddress: 'ab'.repeat(32), wrapRegistered: true, depositAccountRegistered: false,
+  }).steps;
+  // 0.003 + 0.00125 storage + 1 yocto = 0.00425 against 0.0029 left today.
+  const day = rowFit(steps('0.003'), row);
+  assert.equal(day.ok, false);
+  assert.equal(day.reason, 'over_daily_budget');
+  assert.equal(day.needYocto, '4250000000000000000001');
+  assert.match(day.text, /0\.0029 NEAR of today's budget is left/);
+  // After a daily raise the balance is the limit, and the text says how much to add.
+  const bal = rowFit(steps('0.003'), { ...row, daily_budget: '20000000000000000000000' });
+  assert.equal(bal.reason, 'ERR_BALANCE');
+  assert.match(bal.text, /add at least 0\.002551 NEAR/);
+  assert.equal(bal.maxAmountYocto, (1700000000000000000000n - 1250000000000000000001n).toString());
+  // Topped up, it fits.
+  const ok = rowFit(steps('0.003'), { ...row, daily_budget: '20000000000000000000000', balance: '5000000000000000000000' });
+  assert.equal(ok.ok, true);
+  // The old 0.0001 NEAR minimum refuses the 1 yocto ft_transfer before anything is sent.
+  const min = rowFit(steps('0.003'), { ...row, daily_budget: '20000000000000000000000', balance: '5000000000000000000000', min_amount: '100000000000000000000' });
+  assert.equal(min.reason, 'below_min_amount');
+  assert.match(min.text, /Update my rules/);
+  // A wrap over the per-payment cap.
+  const cap = rowFit(steps('0.006'), { ...row, daily_budget: '20000000000000000000000', balance: '9000000000000000000000' });
+  assert.equal(cap.reason, 'over_per_action_cap');
+  // Too few payments left.
+  const n = rowFit(steps('0.003'), { ...row, daily_budget: '20000000000000000000000', balance: '5000000000000000000000', actions_today: 18 });
+  assert.equal(n.reason, 'over_daily_action_count');
+  // depositPlan with a row returns the refusal instead of a plan.
+  const refused = depositPlan({
+    from: 'wNEAR@near', amount: '0.003', depositAddress: 'ab'.repeat(32), wrapRegistered: true, depositAccountRegistered: false, row,
+  });
+  assert.equal(refused.kind, 'row-refuses');
+  assert.equal(refused.steps.length, 0);
+  assert.equal(refused.wallet, false);
 });
 
 test('status SUCCESS sails once, and a refund does not', () => {
@@ -680,25 +720,6 @@ test('the city checkout body uses the pay clause, and propose_call signs the boa
   assert.doesNotMatch(fn, /300n \* TG/);
 });
 
-test('a landed 0.05 wrap is reused and the next plan is only ft_transfer', () => {
-  const held = '50000000000000000000000';
-  const pick = pickWrapSpend({ wantAmount: '0.05', wrapBalanceYocto: held });
-  assert.equal(pick.recover, true);
-  assert.equal(pick.amount, '0.05');
-  assert.equal(pick.amountYocto, held);
-  const plan = depositPlan({
-    from: 'wNEAR@near', amount: pick.amount, depositAddress: 'ab'.repeat(32),
-    capYocto: '60000000000000000000000', balanceYocto: '10000000000000000000000',
-    wrapRegistered: true, wrapBalanceYocto: held, depositAccountRegistered: true,
-  });
-  assert.equal(plan.kind, 'propose_call');
-  assert.equal(plan.recover, true);
-  assert.deepEqual(plan.steps.map(s => s.method), ['ft_transfer']);
-  assert.equal(JSON.parse(plan.steps[0].args).amount, held);
-  assert.equal(plan.steps[0].gasTgas, proposeCallTgas('ft_transfer'));
-  assert.notEqual(plan.steps[0].gasTgas, 300);
-});
-
 test('propose_call prepays the board, the forward and the callback, which 54 Tgas did not', () => {
   // 54 = 4 + 30 + 20 covered only the forward and the callback. The board's own
   // execution (hydrate + write the row and the call policy) had nothing left, so
@@ -728,7 +749,7 @@ test('a landed wrap and a failed send name the tx and do not say nothing was sen
   });
   assert.match(note.text, /Wrapped 0\.05 NEAR \(tx 6srG…\)/);
   assert.match(note.text, /The send to 1Click did not go: session gas allowance is low/);
-  assert.match(note.text, /Your wNEAR is safe in your row and will be used on the next try/);
+  assert.match(note.text, /shared wrap\.near account; it is not reused/);
   assert.doesNotMatch(note.text, /No wrap was sent/);
   assert.equal(note.links[0].url, `https://nearblocks.io/txns/${hash}`);
   assert.equal(note.lowGas, true);
@@ -737,7 +758,7 @@ test('a landed wrap and a failed send name the tx and do not say nothing was sen
   assert.match(blocked.text, /The wrap was not started/);
   assert.doesNotMatch(blocked.text, /Wrapped /);
   const stranded = wrapProgressNote({ failedReason: 'not_enough_allowance', stranded: true });
-  assert.match(stranded.text, /wNEAR is safe in your row/);
+  assert.match(stranded.text, /no NEAR left the row/);
   const ui = read('app/design/D8_shops/js/shopui.js');
   assert.match(ui, /wrapProgressNote/);
   assert.match(ui, /Refresh agent key/);

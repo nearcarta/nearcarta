@@ -356,13 +356,40 @@ function sRules() {
        <div class="field"><label for="daily">Daily budget</label><div class="suffix"><input id="daily" type="number" step="0.001" min="0.001" value="${r.daily}" data-testid="rule-daily"><span>NEAR</span></div><p class="small muted">All payments in one day added up.</p></div>
        <div class="field"><label for="per">Payments per day</label><div class="suffix"><input id="per" type="number" min="1" max="100" value="${r.per}" data-testid="rule-per"><span>per day</span></div><p class="small muted">How many payments the agent may make each day.</p></div>
        <div class="field"><label for="hours">Session</label><select id="hours" data-testid="rule-hours">${SESSION_HOURS.map(h => `<option value="${h}" ${h == r.hours ? 'selected' : ''}>${sessionLabel(h)}</option>`).join('')}</select><p class="small muted">After this the contract refuses every payment. You can write a new session later.</p></div></div>
-     <div class="field"><label for="rcv">Allowed shops (account ids, comma separated)</label><input id="rcv" value="${esc(r.receivers.join(', '))}" spellcheck="false" data-testid="rule-receivers"><p class="small muted">The only accounts your agent may pay. A Try payment goes to the first listed shop. Ferry Ask charter calls stamp on the board and returns that NEAR to your row; it still uses one payment of your cap. The session key also carries the call allowlist, which adds wrap.near's deposit and transfer calls and the house shop's check-in and prepare calls. Those are calls, not payees: to move NEAR through wrap.near yourself, add <code>wrap.near</code> to this list.</p></div>
+     <div class="field"><label for="rcv">Allowed shops (account ids, comma separated)</label><input id="rcv" value="${esc(r.receivers.join(', '))}" spellcheck="false" data-testid="rule-receivers"><p class="small muted">The only accounts your agent may pay. A Try payment goes to the first listed shop. Ferry Ask charter calls stamp on the board and returns that NEAR to your row; it still uses one payment of your cap. The session key also carries the call allowlist, which adds wrap.near's deposit and transfer calls and the house shop's check-in and prepare calls. Those are calls, not payees: to move NEAR through wrap.near yourself, add <code>wrap.near</code> to this list.</p>${ferryChip(r)}</div>
      ${retiredDropped.length
       ? `<p class="small" data-testid="rule-retired-note">Your saved list named ${esc(retiredDropped.join(', '))}, which no longer exists on mainnet, so ${retiredDropped.length > 1 ? 'they were' : 'it was'} removed. Toll, Guardhouse and House are live.</p>`
       : ''}
      <div class="preview" id="prev" data-testid="rule-preview">${preview(r)}</div>${errP()}` + nav(true));
 }
+// Ferry swaps wrap the row's own NEAR on wrap.near, and the board refuses a call to a
+// receiver the row does not list (receiver_not_allowlisted), so the Ferry needs wrap.near in
+// Allowed shops. It is not a default shop: listing it lets the agent move wNEAR, so the
+// visitor adds it on purpose, here or by arriving from the Ferry (/setup?shop=ferry).
+const FERRY_WRAP = 'wrap.near';
+const ferryWanted = () => { try { return new URLSearchParams(location.search).get('shop') === 'ferry'; } catch { return false; } };
+function ferryChip(r) {
+  const on = (r.receivers || []).includes(FERRY_WRAP);
+  return on
+    ? `<p class="small" data-testid="rule-ferry-on">✓ Ferry swaps on: <code>${FERRY_WRAP}</code> is listed, so Load cargo can wrap NEAR from your row and send it to 1Click.</p>`
+    : `<p class="small" data-testid="rule-ferry-hint">Ferry swaps need <code>${FERRY_WRAP}</code> in this list. <button type="button" class="btn" id="add-ferry" data-testid="rule-add-ferry">Add Ferry swaps (wrap.near)</button></p>`;
+}
+let ferryAutoDone = false;
 function wireRules() {
+  if (!ferryAutoDone && ferryWanted() && !(rules().receivers || []).includes(FERRY_WRAP)) {
+    ferryAutoDone = true;
+    st.receivers = [...rules().receivers, FERRY_WRAP]; save();
+    const f = $('#rcv'); if (f) f.value = st.receivers.join(', ');
+    return render();
+  }
+  const addFerry = $('#add-ferry');
+  if (addFerry) addFerry.onclick = () => {
+    const list = rules().receivers || [];
+    if (!list.includes(FERRY_WRAP)) { st.receivers = [...list, FERRY_WRAP]; save(); }
+    // rules() reads the field first, so the field has to carry the new list before the repaint.
+    const f = $('#rcv'); if (f) f.value = st.receivers.join(', ');
+    render();
+  };
   const upd = () => { st.cap = +$('#cap').value; st.daily = +$('#daily').value; st.per = +$('#per').value; st.hours = +$('#hours').value; st.receivers = liveShops($('#rcv').value.split(/[\s,]+/), RETIRED_ACCOUNTS); save(); $('#prev').innerHTML = preview(rules()); };
   ['cap', 'daily', 'per', 'rcv'].forEach(id => {
     const el = $('#' + id);
@@ -463,7 +490,7 @@ function sSign() {
   // key from a row that was closed (or force_closed) must get the open-row primary
   // action, not the update panel for a row that is not there.
   const onChain = live && rowOnChain();
-  const local = { ...r, expiresAt: onChain ? expiresToWrite({ hoursEdited: !!st.hoursEdited, hours: r.hours, chainExpiresAt: chainRow.expires_at }) : undefined };
+  const local = { ...r, minAmount: MIN_AMOUNT_YOCTO, expiresAt: onChain ? expiresToWrite({ hoursEdited: !!st.hoursEdited, hours: r.hours, chainExpiresAt: chainRow.expires_at }) : undefined };
   let update = signRulesUpdate({ live: !!(onChain && onBoard), local, row: onChain && onBoard ? chainRow : null });
   const callsFailed = signLog.some(x => x.k === 'calls' && x.state === 'bad');
   if (!update.changed && callsFailed && onChain && onBoard) update = { changed: true, html: callsFailedPanel() };
@@ -544,8 +571,13 @@ async function accountOn(id, network) {
   const j = await r.json();
   return !j.error && !!j.result;
 }
+// The smallest payment a row allows, in yocto. The live board applies it to every
+// propose_call deposit, and a NEP-141 ft_transfer attaches exactly 1 yocto, so 0.0001 NEAR
+// (the old value) refused the last step of every Ferry wrap with below_min_amount. The
+// contract needs min_amount > 0 (charter_board rules_from ERR_MIN), so 1 is the floor.
+export const MIN_AMOUNT_YOCTO = '1';
 function ruleArgs(r, expiresAt = sessionExpiresAt(r.hours)) {
-  return { receivers: r.receivers, per_action_cap: toY(r.cap), daily_budget: toY(r.daily), max_actions_per_day: r.per, window_start_min: 0, window_end_min: 0, min_amount: toY(0.0001), expires_at: String(expiresAt) };
+  return { receivers: r.receivers, per_action_cap: toY(r.cap), daily_budget: toY(r.daily), max_actions_per_day: r.per, window_start_min: 0, window_end_min: 0, min_amount: MIN_AMOUNT_YOCTO, expires_at: String(expiresAt) };
 }
 function boardArgs(r, agent) {
   return { rules: ruleArgs(r), agent, fund: ROW_FUND.toString() };
@@ -1030,7 +1062,7 @@ function noteSign(k, state, tx) {
   else signLog.push({ k, state, tx });
 }
 function writtenRules(r, row) {
-  return { ...r, expiresAt: expiresToWrite({ hoursEdited: !!st.hoursEdited, hours: r.hours, chainExpiresAt: row?.expires_at }) };
+  return { ...r, minAmount: MIN_AMOUNT_YOCTO, expiresAt: expiresToWrite({ hoursEdited: !!st.hoursEdited, hours: r.hours, chainExpiresAt: row?.expires_at }) };
 }
 async function recentMethodTx(method, ok) {
   if (!me) return null;

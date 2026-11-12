@@ -80,8 +80,8 @@ const PLAIN = [
   [/attach at least|Exceeded the prepaid gas|ERR_LOW_GAS/, 'the network ran out of gas for this step; try again'],
   [/expired|Expired/, 'the request expired before the network took it; try again'],
   // wrap.near ft_transfer when the board holds less wNEAR than the plan (near_deposit kept storage).
-  [/The account doesn't have enough balance/i, 'the wrap account does not hold enough wNEAR for this transfer; Load cargo again to use the stranded wNEAR'],
-  [/doesn't have enough balance/i, 'the wrap account does not hold enough wNEAR for this transfer; Load cargo again to use the stranded wNEAR'],
+  [/The account doesn't have enough balance/i, "the board's wrap.near account did not hold the wNEAR this transfer needed; Load cargo again to wrap fresh NEAR from your row"],
+  [/doesn't have enough balance/i, "the board's wrap.near account did not hold the wNEAR this transfer needed; Load cargo again to wrap fresh NEAR from your row"],
   [/NotEnoughBalance|not enough balance/i, 'your account does not have enough NEAR for this step'],
   [/NotEnoughAllowance/, 'the session key does not have enough gas allowance for this ask'],
 ];
@@ -1160,6 +1160,14 @@ export async function wrapBoardState(board = S.board) {
   return { registered, balanceYocto, storage };
 }
 
+/** The visitor's board row as the chain has it now (spent_today and balance move every call). */
+export async function freshBoardRow() {
+  if (!S.board || !S.me) return null;
+  const row = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
+  if (row) S.boardRow = row;
+  return row;
+}
+
 /**
  * wrap.near steps via the session key's propose_call. Never opens a wallet.
  * A missing key, a key that cannot call propose_call, or a chain refusal returns youSend.
@@ -2029,18 +2037,21 @@ export async function payoutsForeign(row, opts = {}) {
     const st = await wrapStorageOf(depositAddress);
     depRegistered = !!(st && (st.total != null || st.available != null));
   } catch { depRegistered = null; }
-  const spend = pickWrapSpend({ wantAmount: near, wrapBalanceYocto: wrap.balanceYocto });
+  // Always the row's own NEAR: the board's wrap.near balance is shared by every row.
+  const spend = pickWrapSpend({ wantAmount: near });
+  const liveRow = await freshBoardRow();
   const plan = depositPlan({
     from: 'wNEAR@near',
     amount: spend.amount,
     depositAddress,
     memo: row.depositMemo || null,
     capYocto: pay()?.per_action_cap || null,
-    balanceYocto: S.boardRow?.balance || null,
+    balanceYocto: liveRow?.balance || S.boardRow?.balance || null,
     wrapRegistered: wrap.registered,
-    wrapBalanceYocto: wrap.balanceYocto,
     depositAccountRegistered: depRegistered,
+    row: liveRow,
   });
+  if (plan.kind === 'row-refuses') return { ok: false, reason: plan.reason || 'row_refuses', why: plan.why, wallet: false };
   if (plan.kind !== 'propose_call') return { ok: false, reason: plan.why || 'you_send', wallet: false, youSend: true };
   const sent = await ferryProposeCalls(plan.steps);
   if (!sent?.ok) return { ok: false, reason: sent?.reason || 'the deposit did not go', wallet: false, txs: sent?.txs || [], landed: sent?.landed || [] };

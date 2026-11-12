@@ -178,13 +178,24 @@ export function wrapProgressNote({ amount = '', landed = [], failedReason = '', 
     || (/\ballowance\b/i.test(reasonText) && !/allowlist/i.test(reasonText));
   const receiverRefused = /receiver_not_allowlisted/i.test(reasonText);
   // `ft_transfer` on a NEP-141 token attaches 1 yoctoNEAR by convention, and the live board
-  // applied the row's `min_amount` (0.0001 NEAR) to every deposit, so the last step of a wrap
-  // was refused `below_min_amount` after the token had already been wrapped and the deposit
-  // address registered. Measured 2026-11-08, tx 8vz7EkU55ifNaFPARLSFJ6H8eEKAZTBbfTz1WxQqAf4f.
-  // The fix that exempts zero-value calls is staged; until it lands the ferry cannot finish on
-  // a row with a minimum.
+  // applies the row's `min_amount` to every propose_call deposit, so a row whose smallest
+  // payment was 0.0001 NEAR had the last step refused `below_min_amount` after the token had
+  // already been wrapped. Measured 2026-11-08, tx 8vz7EkU55ifNaFPARLSFJ6H8eEKAZTBbfTz1WxQqAf4f.
+  // /setup now writes min_amount = 1 yocto; Update my rules once fixes an older row.
   const belowMin = /below_min_amount/i.test(reasonText);
   const amt = String(amount || '').trim() || '0.05';
+  // The board has ONE wrap.near account for every row. wNEAR a failed try left there is not
+  // this row's any more, and the next try wraps fresh NEAR from the row instead of reusing it.
+  const leftover = 'That wNEAR stays in the board\'s shared wrap.near account; it is not reused, and the next try wraps fresh NEAR from your row.';
+  if (wrap && belowMin) {
+    return {
+      lowGas: false,
+      wrapped: true,
+      belowMin: true,
+      text: `Wrapped ${amt} NEAR (tx ${shortTx(wrap.tx)}), but the token send was refused below_min_amount: your row's smallest payment is above the 1 yocto a token transfer attaches. Open /setup and press Update my rules once. ${leftover}`,
+      links,
+    };
+  }
   if (wrap) {
     const why = low
       ? 'session gas allowance is low'
@@ -192,24 +203,16 @@ export function wrapProgressNote({ amount = '', landed = [], failedReason = '', 
     return {
       lowGas: low,
       wrapped: true,
-      text: `Wrapped ${amt} NEAR (tx ${shortTx(wrap.tx)}). The send to 1Click did not go: ${why}. Your wNEAR is safe in your row and will be used on the next try.`,
+      text: `Wrapped ${amt} NEAR (tx ${shortTx(wrap.tx)}). The send to 1Click did not go: ${why}. ${leftover}`,
       links,
     };
   }
-  if (low && stranded) {
-    return {
-      lowGas: true,
-      wrapped: true,
-      text: 'Session gas is low. Your wNEAR is safe in your row and will be used on the next try. Refresh the agent key, then Load cargo again.',
-      links,
-    };
-  }
-  if (belowMin && wrap) {
+  if (belowMin) {
     return {
       lowGas: false,
-      wrapped: true,
+      wrapped: false,
       belowMin: true,
-      text: `Wrapped ${amt} NEAR and registered the deposit address, but the token send was refused below_min_amount: your row has a smallest payment (0.0001 NEAR) and a token transfer attaches 1 yocto. Your wNEAR is safe in your row. The board build that exempts zero-value calls is staged; until it lands, lower the smallest payment in /setup to its floor or use a row without one.`,
+      text: 'The board refused below_min_amount: your row\'s smallest payment is above the 1 yocto a token transfer attaches. Open /setup and press Update my rules once. No NEAR left the row.',
       links,
     };
   }
@@ -291,18 +294,17 @@ export function nearAmount(yocto) {
 }
 
 /**
- * How much wNEAR this Load cargo should quote and transfer.
- * When wrap.near already holds stranded board balance from an earlier near_deposit
- * (e.g. 0.04875 after storage was kept), spend that and skip a new deposit.
+ * How much wNEAR this Load cargo should quote and transfer: exactly what the visitor asked.
+ *
+ * Every row on the board shares ONE wrap.near account (the board is the predecessor of every
+ * propose_call), so wNEAR the board already holds is not this row's. An earlier build spent
+ * that balance ("stranded wNEAR") and skipped near_deposit, which let any row that may call
+ * wrap.near ft_transfer move wNEAR another row, or the board itself, had deposited.
+ * The row now always wraps its own NEAR first. `wrapBalanceYocto` is accepted and ignored.
  */
-export function pickWrapSpend({ wantAmount, wrapBalanceYocto = null } = {}) {
+export function pickWrapSpend({ wantAmount } = {}) {
   const want = yoctoNear(wantAmount);
-  if (!want) return { amount: wantAmount == null ? '' : String(wantAmount), amountYocto: null, recover: false };
-  let bal = 0n;
-  try { if (wrapBalanceYocto != null && wrapBalanceYocto !== '') bal = BigInt(wrapBalanceYocto); } catch { bal = 0n; }
-  if (bal <= 0n) return { amount: String(wantAmount), amountYocto: want, recover: false };
-  const use = bal < BigInt(want) ? bal : BigInt(want);
-  return { amount: nearAmount(use), amountYocto: use.toString(), recover: true };
+  return { amount: wantAmount == null ? '' : String(wantAmount), amountYocto: want, recover: false };
 }
 
 /** NEAR attached to near_deposit so wrap.near credits exactly `transferYocto` wNEAR. */
@@ -312,17 +314,87 @@ export function wrapDepositYocto(transferYocto, wrapRegistered) {
   return t.toString();
 }
 
+const big = v => { try { return v == null || v === '' ? null : BigInt(v); } catch { return null; } };
+// NEAR for a sentence, to 0.000001. `up` for an amount to add, down for what is left, so the
+// words never promise a fit the chain would refuse. Under 0.000001 it reads in yocto.
+const MICRO = 10n ** 18n;
+const nearText = (y, round = 'down') => {
+  let v;
+  try { v = BigInt(y); } catch { return '?'; }
+  if (v > 0n && v < MICRO) return `${v} yocto`;
+  const q = round === 'up' ? (v + MICRO - 1n) / MICRO : v / MICRO;
+  return nearAmount((q * MICRO).toString()) ?? '?';
+};
+
+/**
+ * Whether these propose_call steps fit the row, checked in the order the board checks them
+ * (contracts/charter_board/src/lib.rs propose_call): smallest payment, per-payment cap, daily
+ * budget, payments per day, row balance. `row` is a get_charter view; spent_today and
+ * actions_today are already zero there after the UTC day turns.
+ *
+ * Returns the first rule that would refuse, in the board's own words, plus the largest swap
+ * amount that would fit, so the page can say what to type instead of only "no".
+ */
+export function rowFit(steps, row) {
+  const list = Array.isArray(steps) ? steps : [];
+  if (!row) return { ok: true, reason: null, text: '', needYocto: null, maxAmountYocto: null };
+  const cap = big(row.per_action_cap);
+  const min = big(row.min_amount) ?? 0n;
+  const daily = big(row.daily_budget);
+  const spent = big(row.spent_today) ?? 0n;
+  const perDay = row.max_actions_per_day == null ? null : Number(row.max_actions_per_day);
+  const count = Number(row.actions_today || 0);
+  const bal = big(row.balance);
+  const deposits = list.map(s => BigInt(s.deposit));
+  const need = deposits.reduce((n, d) => n + d, 0n);
+  const wrapStep = list.find(s => s.method === 'near_deposit');
+  const fixed = need - (wrapStep ? BigInt(wrapStep.deposit) : 0n);
+  const dailyLeft = daily == null ? null : (daily > spent ? daily - spent : 0n);
+  let most = null;
+  const lower = v => { if (v == null) return; const x = v < 0n ? 0n : v; most = most == null || x < most ? x : most; };
+  if (wrapStep) {
+    lower(cap);
+    if (dailyLeft != null) lower(dailyLeft - fixed);
+    if (bal != null) lower(bal - fixed);
+  }
+  const out = (reason, text) => ({ ok: false, reason, text, needYocto: need.toString(), maxAmountYocto: most == null ? null : most.toString() });
+  const tryLess = most != null && most > 0n ? ` Swap ${nearText(most.toString())} NEAR or less, or` : '';
+  const small = deposits.find(d => d > 0n && d < min);
+  if (small != null) {
+    return out('below_min_amount', `Your row's smallest payment is ${nearText(min.toString())} NEAR, and a token transfer attaches ${nearText(small.toString())}. Open /setup, press Update my rules once (smallest payment becomes 1 yocto), then Load cargo again. Nothing was sent.`);
+  }
+  const over = cap == null ? null : deposits.find(d => d > cap);
+  if (over != null) {
+    return out('over_per_action_cap', `One step of this swap is ${nearText(over.toString())} NEAR and your row allows ${nearText(cap.toString())} NEAR per payment.${tryLess} raise Max per payment in /setup. Nothing was sent.`);
+  }
+  if (dailyLeft != null && need > dailyLeft) {
+    return out('over_daily_budget', `This swap takes ${nearText(need.toString(), 'up')} NEAR from your row in ${list.length} steps and ${nearText(dailyLeft.toString())} NEAR of today's budget is left.${tryLess} raise the daily budget in /setup. Nothing was sent.`);
+  }
+  if (perDay != null && count + list.length > perDay) {
+    return out('over_daily_action_count', `This swap needs ${list.length} payments and your row has ${Math.max(0, perDay - count)} left today. Raise Payments per day in /setup or wait for 00:00 UTC. Nothing was sent.`);
+  }
+  if (bal != null && need > bal) {
+    const short = need - bal;
+    return out('ERR_BALANCE', `This swap takes ${nearText(need.toString(), 'up')} NEAR from your row and the row holds ${nearText(bal.toString())} NEAR.${tryLess} add at least ${nearText(short.toString(), 'up')} NEAR to the row in /setup. Nothing was sent.`);
+  }
+  return { ok: true, reason: null, text: '', needYocto: need.toString(), maxAmountYocto: most == null ? null : most.toString() };
+}
+
 /**
  * NEAR-native corridors can be wrap.near calls from the row.
  * Anything else, or a deposit over the cap, is "you send". wallet is always false.
  *
- * wrapRegistered / wrapBalanceYocto come from wrap.near view calls on the board:
- * - unregistered board: near_deposit keeps WRAP_STORAGE_YOCTO, so attach transfer+storage
- * - stranded wNEAR (wrapBalance >= transfer): skip near_deposit; only storage_deposit + ft_transfer
+ * The plan always starts with near_deposit of the row's own NEAR, so the ft_transfer that
+ * follows moves wNEAR this row just deposited and never the board's shared balance.
+ * `wrapRegistered` comes from wrap.near storage_balance_of on the board: an unregistered board
+ * keeps WRAP_STORAGE_YOCTO of the first deposit, so the wrap attaches transfer + storage.
+ * `wrapBalanceYocto` is ignored (see pickWrapSpend).
+ * With `row` (a get_charter view) the whole plan is checked against the row first and a plan
+ * the board would refuse comes back as kind 'row-refuses' with the reason in plain words.
  */
 export function depositPlan({
   from, amount, depositAddress, memo = null, capYocto = null, balanceYocto = null, keyMethods = null,
-  wrapRegistered = null, wrapBalanceYocto = null, depositAccountRegistered = null,
+  wrapRegistered = null, depositAccountRegistered = null, row = null,
 } = {}) {
   const you = (why) => ({ kind: 'you-send', why, wallet: false, steps: [], recover: false });
   if (!nearNative(from)) return you('This chain is not wrap.near. Send the tokens yourself to the deposit address.');
@@ -334,19 +406,13 @@ export function depositPlan({
   if (!amt) return you('The NEAR amount is not a number. Send the tokens yourself.');
   let cap = null;
   let bal = null;
-  let wrapBal = 0n;
   try { if (capYocto != null && capYocto !== '') cap = BigInt(capYocto); } catch { return you('The session cap is not a number.'); }
   try { if (balanceYocto != null && balanceYocto !== '') bal = BigInt(balanceYocto); } catch { bal = null; }
-  try { if (wrapBalanceYocto != null && wrapBalanceYocto !== '') wrapBal = BigInt(wrapBalanceYocto); } catch { wrapBal = 0n; }
-  const recover = wrapBal >= BigInt(amt);
-  const steps = [];
-  if (!recover) {
-    steps.push({
-      receiver: WRAP, method: 'near_deposit', args: '{}',
-      deposit: wrapDepositYocto(amt, wrapRegistered),
-      gasTgas: proposeCallTgas('near_deposit'),
-    });
-  }
+  const steps = [{
+    receiver: WRAP, method: 'near_deposit', args: '{}',
+    deposit: wrapDepositYocto(amt, wrapRegistered),
+    gasTgas: proposeCallTgas('near_deposit'),
+  }];
   if (depositAccountRegistered !== true) {
     steps.push({
       receiver: WRAP, method: 'storage_deposit',
@@ -361,6 +427,12 @@ export function depositPlan({
     deposit: '1',
     gasTgas: proposeCallTgas('ft_transfer'),
   });
+  if (row) {
+    const fit = rowFit(steps, row);
+    if (!fit.ok) {
+      return { kind: 'row-refuses', why: fit.text, reason: fit.reason, wallet: false, steps: [], recover: false, needYocto: fit.needYocto, maxAmountYocto: fit.maxAmountYocto, transferYocto: amt };
+    }
+  }
   let sum = 0n;
   for (const s of steps) {
     const d = BigInt(s.deposit);
@@ -370,11 +442,12 @@ export function depositPlan({
   if (bal != null && sum > bal) return you('The row does not hold enough NEAR for this wrap. Send it yourself to the deposit address.');
   return {
     kind: 'propose_call',
-    why: recover ? 'Using stranded wNEAR on the board; no new near_deposit.' : '',
+    why: '',
     wallet: false,
     steps,
-    recover,
+    recover: false,
     transferYocto: amt,
+    needYocto: sum.toString(),
   };
 }
 
