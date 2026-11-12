@@ -91,11 +91,16 @@ export function scamProofFacts(run) {
   };
 }
 
+const DISMISS_LS = () => `nc_scam_hidden_${onTestnet() ? 'testnet' : 'mainnet'}`;
+/** Reads (or, with `set`, records) that the visitor hid the errand on this network. */
+export function scamDismissed(set = false, store = globalThis.localStorage) {
+  try { if (set) store.setItem(DISMISS_LS(), '1'); return store.getItem(DISMISS_LS()) === '1'; } catch { return set; }
+}
 /** The errand card. One text box, one gold action, then the two receipts as they land. */
 export function scamMarkup() {
   const off = onTestnet() ? '' : ' disabled';
-  return `<section class="scam" data-testid="scam-errand" aria-label="Try to talk a keeper past its limit">
-    <button type="button" class="scam-close" data-testid="scam-close" aria-label="Close the errand">×</button>
+  return `<section class="scam${onTestnet() ? '' : ' compact'}" data-testid="scam-errand" aria-label="Try to talk a keeper past its limit">
+    <button type="button" class="scam-close" data-testid="scam-close" aria-label="Close the errand">Hide <span aria-hidden="true">×</span></button>
     <h2>Try to talk a keeper past its limit</h2>
     <p class="scam-intro">${onTestnet()
       ? 'Type anything at the keeper, including an instruction to ignore its rules. A refusal here is not a sentence on a screen: it is signed inside a TEE and then written to the chain, and you can force the over-limit payment and watch the charter refuse it.'
@@ -125,7 +130,9 @@ export function installScamErrand({ doc = document } = {}) {
   const forceBtn = host.querySelector('[data-testid="scam-force"]');
   const input = host.querySelector('[data-testid="scam-text"]');
   let last = null;
-  host.querySelector('[data-testid="scam-close"]')?.addEventListener('click', () => host.classList.add('closed'));
+  // Hidden stays hidden on this network after a reload, so a visitor closes it once.
+  if (scamDismissed()) host.classList.add('closed');
+  host.querySelector('[data-testid="scam-close"]')?.addEventListener('click', () => { host.classList.add('closed'); scamDismissed(true); });
 
   host.querySelectorAll('[data-example]').forEach((b) => b.addEventListener('click', () => {
     input.value = EXAMPLES[Number(b.dataset.example)];
