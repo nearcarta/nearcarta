@@ -71,22 +71,29 @@ export function guardMarkup(state = {}, _attacks = [], esc = s => String(s ?? ''
   const amount = `<label class="field guard-field">Amount <input id="g-amt" data-testid="guard-amount" inputmode="decimal" value="${esc(state.amount || '')}" autocomplete="off"></label>`;
   const invoice = `<label class="field guard-field">Invoice <textarea id="g-invoice" data-testid="guard-invoice" rows="2">${esc(state.invoice || '')}</textarea></label>`;
   const status = statusBlock(state, esc);
+  const held = state.pending === 'human' && state.holdId;
+  const heldBusy = BUSY[state.inflight] || '';
+  const heldCard = held
+    ? `<div class="guard-held" data-testid="guard-held" role="status"><p class="guard-status"><b>Held on the board · hold #${esc(String(state.holdId))}.</b> Only you can confirm it: Confirm sends it, Cancel refunds it to your row.</p>
+      <div class="guard-actions">${gold('g-confirm', 'guard-confirm', 'Confirm this payment', heldBusy)}<button type="button" class="guard-quiet" id="g-cancel" data-testid="guard-cancel"${heldBusy ? ' disabled' : ''}>Cancel</button></div></div>`
+    : '';
   const check = `<div class="guard-pane" data-pane="check" data-testid="guard-pane-check" ${tab === 'check' ? '' : 'hidden'}>
+      ${tab === 'check' ? heldCard : ''}
       ${tab === 'check' ? flow : ''}
       ${tab === 'check' ? payee : ''}
       <p class="example-row"><button type="button" class="example" data-testid="guard-example">${esc(state.example || 'Example: a look-alike of your own account')}</button></p>
       ${tab === 'check' ? gold('g-check', 'guard-check', 'Check payee') : ''}
       ${tab === 'check' ? status : ''}
     </div>`;
-  const held = state.pending === 'human' && state.holdId;
   const busy = BUSY[state.inflight] || '';
-  const payCta = held
-    ? gold('g-confirm', 'guard-confirm', 'Confirm this payment', busy)
-    : gold('g-pay', 'guard-pay', 'Pay through guard', busy);
-  const cancel = held ? `<button type="button" class="guard-quiet" id="g-cancel" data-testid="guard-cancel"${busy ? ' disabled' : ''}>Cancel</button>` : '';
+  // F47 (film 2026-11-12): an open hold gets its own card, on Check and on Pay safely, that
+  // names it and carries Confirm and Cancel. The pay form keeps its own button: Confirm and
+  // Cancel under an empty form, with nothing said about the hold, read as a broken form.
+  const payCta = gold('g-pay', 'guard-pay', 'Pay through guard', busy);
+  const cancel = '';
   const pendingLine = busy && state.inflight !== 'agent' ? '<p class="guard-status" data-testid="guard-pending" role="status">Sent to the board. The chain answers in a few seconds. Do not press again.</p>' : '';
   const pay = `<div class="guard-pane" data-pane="pay" data-testid="guard-pane-pay" ${tab === 'pay' ? '' : 'hidden'}>
-      ${tab === 'pay' ? `${flow}${payee}${pair}${amount}${invoice}<div class="guard-actions">${payCta}${cancel}</div>${pendingLine}${status}` : ''}
+      ${tab === 'pay' ? `${heldCard}${flow}${payee}${pair}${amount}${invoice}<div class="guard-actions">${payCta}${cancel}</div>${pendingLine}${status}` : ''}
     </div>`;
   const holds = state.book ? [...state.book.book.holds.values()] : [];
   const refunds = state.book ? [...state.book.book.refunds.values()] : [];
