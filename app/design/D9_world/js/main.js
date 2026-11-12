@@ -238,10 +238,15 @@ function goIn(id){ if(CLOSED.has(id)) return; const s=SHOPS[id]; R.steer=null; k
 window.__enterToll = () => goIn('toll');
 // The guide: walk the Lamplighter to a shop's door step and stop there (no entry). Resolves true on arrival.
 // Market Day uses it when the player asks the guide for something; the camera follows at street height.
-world.walkTo=(id)=>new Promise(res=>{ const s=SHOPS[id]; if(!s||inShop){ res(false); return; } if(mode==='story') endStory(); if(mode!=='explore') explore(true);
+// F55/F58 (film 2026-11-12): Market Day walks took 40-70 s, and the long path to the House put the
+// camera inside a wall. `{fast:true, max:s}` runs at a brisk pace and, after `max` real seconds, steps
+// the Lamplighter onto the door step, so a walk is a few seconds and never a long camera crawl.
+world.walkTo=(id,opt={})=>new Promise(res=>{ const s=SHOPS[id]; if(!s||inShop){ res(false); return; } if(mode==='story') endStory(); if(mode!=='explore') explore(true);
   R.steer=null; keys.clear(); prompt(null); R.release(.2); let done=false; const fin=()=>{ if(done) return; done=true; R.stop(); R.faceTo(hx(s.q,s.r)); res(true); };
   const end=hx(...s.door).lerp(hx(s.q,s.r),-.12); const far=R.pos.distanceTo(end);
   if(far<.4){ fin(); return; } if(far<1.6) R.go([end],{arrive:fin}); else if(!R.goHex(s.door,{end,run:far>3,arrive:fin})) R.go([end],{arrive:fin});
+  if(opt.fast){ R.maxSpeed=R.goalSpeed=R.runSpd*1.6; }
+  if(opt.max>0) setTimeout(()=>{ if(done) return; R.stop(); R.pos.x=end.x; R.pos.z=end.z; fin(); }, opt.max*1000);
   setTimeoutSim(fin,Math.min(14,1.2+far/(far>3?R.runSpd:R.walkSpd)*1.4)); });
 world.zoom=z=>{ const was=PC.z; if(z!=null) setZoom(z); return was; };
 // Market Day: the door of a shop (where the building's front face is), its outward direction, for the quest light.

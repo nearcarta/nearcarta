@@ -68,7 +68,7 @@ export async function move(calls, opts = {}) {
       // Low market storage (the moves before this one wrote new records) is topped up by the relayer for
       // free, then the move is tried again. Fresh-guest proof 2026-11-12: the House invest was refused
       // ERR_PRECHECK_STORAGE on the first press and went through on the second.
-      if (e.code === 'ERR_PRECHECK_STORAGE') await ensureSession().catch(() => null);
+      if (e.code === 'ERR_PRECHECK_STORAGE') await ensureStorage().catch(() => null);
       await new Promise((r) => setTimeout(r, 1500));
     }
   }
@@ -122,6 +122,22 @@ export async function ensureSession() {
   if (!s) return null;
   const res = await fetch(api('/api/relay/session'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ account_id: s.accountId }) });
   return res.json().catch(() => null);
+}
+
+// F52 (film 2026-11-12, prod 715f1e11): the House invest's first press still came back
+// ERR_PRECHECK_STORAGE. /relay/session is limited to 3 calls a minute per visitor, and the invest
+// called it before the salt run, after it, and on every retry, so the top-up that mattered could be
+// refused, and a top-up that did land could still be unseen by the relayer's next read. Now the session
+// is asked only when the storage is really low, and the move waits until the chain shows it.
+export const STORAGE_MIN = 6n * 10n ** 21n; // over the market precheck's 0.005 NEAR, at the relayer's own top-up line
+async function storageOf() { try { const v = await view('storage_balance_of', { account_id: (await guestSigner())?.accountId }); return v == null ? 0n : BigInt(typeof v === 'object' ? (v.total ?? 0) : v); } catch { return null; } }
+let lastSession = 0;
+export async function ensureStorage(min = STORAGE_MIN, { wait = 12 } = {}) {
+  let have = await storageOf();
+  if (have != null && have >= min) return have;
+  if (Date.now() - lastSession > 8000) { lastSession = Date.now(); await ensureSession().catch(() => null); }
+  for (let i = 0; i < wait; i++) { have = await storageOf(); if (have == null || have >= min) return have; await new Promise((r) => setTimeout(r, 1000)); }
+  return have;
 }
 
 /**
@@ -269,6 +285,9 @@ async function waitForGood(good, want, ms = 9000) {
   return n;
 }
 const waitForSalt = (want, ms) => waitForGood('good:salt', want, ms);
+// F53: the city HUD and the sale offer read the guest's real purse and the Arena's real quote.
+export const coins = async () => purse();
+export async function saltQuote() { try { const q = await view('quote', { shop: 'arena', good: 'good:salt' }); return q?.sell ? BigInt(q.sell) : null; } catch { return null; } }
 const purse = async () => { try { const sq = await view('square', { account_id: account() }); return BigInt(sq?.purse ?? 0n); } catch { return null; } };
 
 /**
@@ -300,14 +319,15 @@ export async function step(id, ctx = {}) {
     return record(id, `Sold ${n} salt at the Arena (testnet)`, { ...r, ...price, total: before != null && after != null ? after - before : null });
   }
   if (id === 'invest') {
-    await ensureSession();
+    await ensureStorage();
     const shop = ctx.shop || 'ferry';
     // A share costs one milliNEAR (10 coins) from the purse. Every guest's sale leaves more salt on the
     // Arena shelf, so three salt can fetch less than 10 coins; the purse is topped up with more salt first.
     const top = await topUpPurse();
     if (top?.short) return record(id, `Bought a ${shop} share (testnet)`, { hash: top.hash || null, failure: `ERR_PURSE_SHORT: ${coinText(top.have)} of 10 coins after selling more salt. The Arena is paying little for salt right now.` });
-    // The salt gathered and sold above can use the storage the first top-up gave; top it up again.
-    await ensureSession().catch(() => null);
+    // The salt gathered and sold above can use the storage the first top-up gave; top it up again
+    // and wait until the chain shows it, so the first press goes through.
+    await ensureStorage().catch(() => null);
     const r = await move({ method: 'purse', args: { action: 'invest', amount: String(MILLI), shop }, tgas: 20 });
     return record(id, `Bought a ${shop} share (testnet)`, r);
   }

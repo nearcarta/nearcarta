@@ -287,3 +287,8 @@ body.md-play.qs-on #tray #t-src { display: none !important; }
 
 .md-google { display: block; text-align: center; text-decoration: none; margin: 4px 0 2px; }
 @media (max-width: 520px) { .md-hud .md-new { font-size: 12px; padding: 0 8px; height: 28px; } }
+/* F59 (film 2026-11-12): receipt titles ("Bought a ferry share (testnet)") were cut at the sheet's
+   right edge. In the Receipt sheet they wrap; the small line under them wraps too. */
+.md-sheet .md-list .md-row.static .md-nm b { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.25; overflow-wrap: anywhere; }
+.md-sheet .md-list .md-row.static .md-nm small { overflow-wrap: anywhere; }
+.md-sheet .md-list .md-row.static > a { flex: 0 0 auto; }
