@@ -135,6 +135,10 @@ button.md-row:hover { border-color: var(--md-soft); }
 .md-hud .md-exit { width: 40px; height: 40px; border-radius: 20px; border: 0; background: transparent; display: grid; place-items: center; color: var(--md-muted); }
 .md-hud .md-exit:hover { color: var(--md-cream); background: rgba(247,213,126,.08); }
 .md-hud .md-exit .i { width: 18px; height: 18px; }
+.md-hud .md-new { height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid rgba(247,213,126,.35); background: transparent; color: var(--md-cream); font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.md-hud .md-new:hover { background: rgba(247,213,126,.1); }
+.md-hud .md-new.gold { background: var(--md-gold-hi); color: #1d140c; border-color: transparent; font-weight: 600; }
+.md-hud .md-new[hidden] { display: none; }
 
 /* ---------- the quest bar: lantern, next step, bag ---------- */
 .md-dock { position: fixed; z-index: 22; left: 50%; bottom: 20px; transform: translateX(-50%); align-items: center; gap: 8px; padding: 8px; border-radius: 24px; border: 1px solid var(--md-line);
@@ -282,3 +286,4 @@ body.md-play.qs-on #tray #t-src { display: none !important; }
 @media (max-width:720px){ .md-ring{width:18px;height:18px;flex-basis:18px} .md-reward small{display:none} }
 
 .md-google { display: block; text-align: center; text-decoration: none; margin: 4px 0 2px; }
+@media (max-width: 520px) { .md-hud .md-new { font-size: 12px; padding: 0 8px; height: 28px; } }
