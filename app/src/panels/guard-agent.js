@@ -138,6 +138,19 @@ function applyRead(state, read) {
   state.pending = state.bound.release === 'warn' ? 'human' : null;
 }
 
+/**
+ * A held payment must survive a page reload. `state` lives in memory only, so a visitor who
+ * refreshed lost the Cancel button and the refundable hold looked unreachable (and it blocked
+ * close_charter with ERR_IN_FLIGHT). Keep it beside the session in localStorage.
+ */
+function keepHold(state) {
+  try {
+    const k = 'nearcarta.guard.hold.' + (state.owner || state.row || '');
+    if (state.holdId) localStorage.setItem(k, String(state.holdId));
+    else localStorage.removeItem(k);
+  } catch { /* private mode: the in-memory id still works for this page */ }
+}
+
 export async function runGuardAction(plan, ctx = {}) {
   const state = ctx.state || {};
   const { check, freeze, capYocto = null, sendPay, sendConfirm, sendCancel } = ctx;
@@ -201,16 +214,14 @@ export async function runGuardAction(plan, ctx = {}) {
         hint: 'Check this payee first. Pay signs only a payment the check has seen. Nothing was signed.' };
     }
     const result = bookOf(state).pay(state.bound);
-    state.pending = result.needsHuman ? 'human' : null;
-    state.holdId = result.hold?.id || state.holdId || null;
-    // A held payment must survive a page reload. `state` lives in memory only, so a visitor
-    // who refreshed lost the Cancel button and the refundable hold looked unreachable (and it
-    // blocked close_charter with ERR_IN_FLIGHT). Keep it beside the session in localStorage.
-    try {
-      const k = 'nearcarta.guard.hold.' + (state.owner || state.row || '');
-      if (state.holdId) localStorage.setItem(k, String(state.holdId));
-      else localStorage.removeItem(k);
-    } catch { /* private mode: the in-memory id still works for this page */ }
+    // Offline only. With a live executor the hold id is the board's action id (the row nonce
+    // the send used), set below from what the chain answered. The book's own id is a local
+    // counter, and a Confirm built from it named a hold the board does not have.
+    if (typeof sendPay !== 'function') {
+      state.pending = result.needsHuman ? 'human' : null;
+      state.holdId = result.hold?.id || state.holdId || null;
+      keepHold(state);
+    }
     const verdict = state.bound?.verdict === 'block' || result.status === 'refunded' ? 'block'
       : result.status === 'prepared' ? 'allow' : 'warn';
     // The live executor is the only thing that signs. It is shared with the gold CTA, so the
@@ -223,8 +234,20 @@ export async function runGuardAction(plan, ctx = {}) {
         live = await sendPay({ payee: state.acct, amountYocto: yocto == null ? '' : yocto.toString(), invoice: state.invoice || '', verdict, chain: state.chain || 'near', asset: state.asset || 'NEAR' });
       } catch (e) { live = { ok: false, signed: false, tx: null, why: e?.message || 'The guard did not answer.' }; }
     }
+    // F38 (film 2026-11-12): a held send showed "Only you can confirm it" with no Confirm
+    // control, because the tray shows Confirm only for `pending === 'human'` with a hold id and
+    // neither was set from the live answer. The board's hold id is the nonce the send used.
+    if (live?.ok && live.hold && live.nonce != null) {
+      state.pending = 'human';
+      state.holdId = String(live.nonce);
+      keepHold(state);
+    } else if (live?.ok && live.tx) {
+      state.pending = null;
+      state.holdId = null;
+      keepHold(state);
+    }
     if (live?.tx) {
-      state.notice = live.hold ? 'Held on the board. Only you can confirm it.' : `Paid through the guard. tx ${String(live.tx).slice(0, 10)}…`;
+      state.notice = live.ok && live.hold ? 'Held on the board. Only you can release it: press Confirm this payment, or Cancel to refund.' : `Paid through the guard. tx ${String(live.tx).slice(0, 10)}…`;
     } else if (live && !live.ok) {
       state.notice = live.why || live.reason || 'The guard refused. Nothing was forwarded.';
     } else if (result.status === 'held') state.notice = 'Held for confirm_hold. The agent cannot confirm.';
@@ -251,7 +274,7 @@ export async function runGuardAction(plan, ctx = {}) {
     let live;
     try { live = await sendConfirm({ holdId: id }); }
     catch (e) { live = { ok: false, signed: false, tx: null, why: e?.message || 'The confirm did not answer.' }; }
-    if (live?.ok) state.pending = null;
+    if (live?.ok) { state.pending = null; state.holdId = null; keepHold(state); }
     return { ...live, action: 'confirm', propose: false, cinema: !!live?.tx, seal: false, lamps: lampsFor(state.chk),
       hint: live?.tx ? 'You released the hold. The board called the guard.' : (live?.why || 'The confirm was refused. Nothing moved.') };
   }
@@ -262,7 +285,7 @@ export async function runGuardAction(plan, ctx = {}) {
     let live;
     try { live = await sendCancel({ holdId: id }); }
     catch (e) { live = { ok: false, signed: false, tx: null, why: e?.message || 'Cancel did not answer.' }; }
-    if (live?.ok) { state.pending = null; state.holdId = null; }
+    if (live?.ok) { state.pending = null; state.holdId = null; keepHold(state); }
     return { ...live, action: 'cancel', propose: false, seal: false,
       hint: live?.tx ? 'Cancelled. The NEAR returned to your row.' : (live?.why || 'Cancel was refused. Nothing moved.') };
   }

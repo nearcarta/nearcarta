@@ -156,3 +156,4 @@ body.hall-tray #shopUI .hall-cta{
   #hall-agent-dock{right:8px;bottom:calc(12px + env(safe-area-inset-bottom,0px))}
   .hall-agent-pop{width:min(220px,calc(100vw - 120px))}
 }
+.hall-tx a{overflow-wrap:anywhere;word-break:break-all}

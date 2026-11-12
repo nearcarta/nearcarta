@@ -49,9 +49,13 @@ function statusBlock(state, esc) {
   return `<p class="guard-status" data-testid="guard-verdict">${esc(score.summary || '')}</p><p class="guard-status" data-testid="guard-score">${bits.join(' · ')}${reasons ? ' ' + reasons : ''}${href}${sent}${extra}</p>`;
 }
 
-function gold(id, testid, label) {
+function gold(id, testid, label, busy = '') {
+  // F38: while a send is on its way the button stays where it is, disabled, and says what it is
+  // waiting for. A second press used to sign a second payment.
+  if (busy) return `<button type="button" class="primary guard-cta" id="${id}" data-testid="${testid}" disabled aria-busy="true">${busy}</button>`;
   return `<button type="button" class="primary guard-cta" id="${id}" data-testid="${testid}">${label}</button>`;
 }
+const BUSY = { pay: 'Paying… waiting for the chain', confirm: 'Releasing… waiting for the chain', cancel: 'Refunding… waiting for the chain', agent: 'Working…' };
 
 export function guardMarkup(state = {}, _attacks = [], esc = s => String(s ?? '')) {
   const tab = state.tab || 'check';
@@ -74,12 +78,15 @@ export function guardMarkup(state = {}, _attacks = [], esc = s => String(s ?? ''
       ${tab === 'check' ? gold('g-check', 'guard-check', 'Check payee') : ''}
       ${tab === 'check' ? status : ''}
     </div>`;
-  const held = state.pending === 'human' && state.holdId;  const payCta = held
-    ? gold('g-confirm', 'guard-confirm', 'Confirm this payment')
-    : gold('g-pay', 'guard-pay', 'Pay through guard');
-  const cancel = held ? '<button type="button" class="guard-quiet" id="g-cancel" data-testid="guard-cancel">Cancel</button>' : '';
+  const held = state.pending === 'human' && state.holdId;
+  const busy = BUSY[state.inflight] || '';
+  const payCta = held
+    ? gold('g-confirm', 'guard-confirm', 'Confirm this payment', busy)
+    : gold('g-pay', 'guard-pay', 'Pay through guard', busy);
+  const cancel = held ? `<button type="button" class="guard-quiet" id="g-cancel" data-testid="guard-cancel"${busy ? ' disabled' : ''}>Cancel</button>` : '';
+  const pendingLine = busy && state.inflight !== 'agent' ? '<p class="guard-status" data-testid="guard-pending" role="status">Sent to the board. The chain answers in a few seconds. Do not press again.</p>' : '';
   const pay = `<div class="guard-pane" data-pane="pay" data-testid="guard-pane-pay" ${tab === 'pay' ? '' : 'hidden'}>
-      ${tab === 'pay' ? `${flow}${payee}${pair}${amount}${invoice}<div class="guard-actions">${payCta}${cancel}</div>${status}` : ''}
+      ${tab === 'pay' ? `${flow}${payee}${pair}${amount}${invoice}<div class="guard-actions">${payCta}${cancel}</div>${pendingLine}${status}` : ''}
     </div>`;
   const holds = state.book ? [...state.book.book.holds.values()] : [];
   const refunds = state.book ? [...state.book.book.refunds.values()] : [];
@@ -226,7 +233,21 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
   // runGuardAction that needs `check`, the caps and the send functions.
   const modelAgent = typeof hooks.runAgent === 'function' ? hooks.runAgent : null;
 
+  // One live send at a time, from the button or the agent box. Both reach the chain through
+  // runGuardAction, so the guard sits here.
+  async function inflight(action, job) {
+    if (state.inflight) return { ok: false, busy: true, hint: 'A payment is already on its way. Nothing else was signed.' };
+    const live = action === 'pay' || action === 'confirm' || action === 'cancel' || action === 'agent';
+    if (live) { state.inflight = action; paint(); }
+    try { return await job(); }
+    finally { if (live) { state.inflight = null; paint(); } }
+  }
+
   async function runAgent(text) {
+    if (state.inflight) { agentLog('A payment is already on its way. Nothing else was signed.', true); return { ok: false, busy: true }; }
+    return inflight('agent', () => runAgentNow(text));
+  }
+  async function runAgentNow(text) {
     scene({ clear: true, seal: false });
     readForm();
     const result = modelAgent ? await modelAgent(text, ctx()) : await runGuardAgent({ text, ...ctx() });
@@ -237,7 +258,10 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
     return result;
   }
 
-  async function runPlan(plan) {
+  function runPlan(plan) {
+    return inflight(plan?.action, () => runPlanNow(plan));
+  }
+  async function runPlanNow(plan) {
     scene({ clear: true, seal: false });
     readForm();
     const fields = {
@@ -374,4 +398,24 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
   hooks.localPaint = localPaint;
   localPaint();
   loadLive();
+  syncHolds();
+
+  // The chain's list of open holds decides whether Confirm is shown: a hold from another tab
+  // or before a reload gets its controls back, and one already released elsewhere loses them.
+  // An unanswered read (null) changes nothing.
+  async function syncHolds() {
+    if (typeof hooks.holds !== 'function') return;
+    let ids = null;
+    try { ids = await hooks.holds(); } catch { ids = null; }
+    if (!Array.isArray(ids) || state.inflight) return;
+    const had = state.holdId ? String(state.holdId) : '';
+    if (had && !ids.includes(had)) { state.holdId = null; state.pending = null; }
+    if (!state.holdId && ids.length) { state.holdId = ids[ids.length - 1]; state.pending = 'human'; }
+    if (String(state.holdId || '') === had) return;
+    try {
+      const k = 'nearcarta.guard.hold.' + (state.owner || '');
+      if (state.owner) { if (state.holdId) localStorage.setItem(k, String(state.holdId)); else localStorage.removeItem(k); }
+    } catch { /* private mode */ }
+    if (root?.isConnected !== false) paint();
+  }
 }

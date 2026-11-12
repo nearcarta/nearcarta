@@ -235,7 +235,7 @@ export function mountHouseRoom(root, hooks = {}) {
         const sent = await hooks.houseSend(result);
         if (sent?.tx) {
           setStatus(sent.ok ? `Sent · ${sent.tx.slice(0, 10)}…` : `${sent.hint || 'Refused.'}`);
-          if (sent.ok) hooks.onDelivered?.(sent);
+          if (sent.ok) { hooks.onDelivered?.(sent); setTimeout(() => loadHistory(), 2500); }
           else hooks.hideRefuse?.();
         } else if (sent?.hint) setStatus(sent.hint);
       } catch (e) {
@@ -281,8 +281,12 @@ export function mountHouseRoom(root, hooks = {}) {
       try {
         const out = await hooks.setLine(form);
         setStatus(`Heirs set · tx ${String(out?.tx || '').slice(0, 10)}… Reading the deed…`);
-        state.line = await fetch(api() + API_PATH + '/house/line/' + encodeURIComponent(id), { cache: 'no-store' }).then(r => r.json()).catch(() => state.line);
+        // F39 (film 2026-11-12): one read right after the wallet returned still saw the old deed
+        // (the view answers at `final`, a block or two behind, and a busy server answers 429), so
+        // the panel kept "No heirs yet" until the shop was reopened. Read until the line is there.
+        state.line = await readLineUntilSet(state.line);
         paintHeirs();
+        loadHistory();
         setStatus(`Heirs set · tx ${String(out?.tx || '').slice(0, 10)}… Now I'm alive checks in through your row.`);
       } catch (e) {
         setStatus(String(e?.message || 'The heirs were not set. Nothing was signed.').slice(0, 180));
@@ -419,12 +423,49 @@ export function mountHouseRoom(root, hooks = {}) {
     .then(r => r.json())
     .then(body => { state.line = body; paintHeirs(); })
     .catch(() => { state.line = { live: false, why: 'house_line is not on this deed. Nothing was signed.' }; paintHeirs(); });
-  // The NFT track asks for a history per deed. Every row here is a real transaction, linked.
-  fetch(api() + API_PATH + '/house/history/' + encodeURIComponent(id), { cache: 'no-store' })
-    .then(r => r.json())
-    .then(body => {
-      const box = root.querySelector('[data-testid=house-history-body]');
-      if (!box) return;
+  loadHistory();
+
+  state.contract = DEED.contract;
+  return { turn, state };
+
+  /** The line, re-read until it names heirs (about 20 s at most). Falls back to what it had. */
+  async function readLineUntilSet(prev) {
+    let last = prev;
+    for (let i = 0; i < 12; i++) {
+      if (i) await new Promise(r => setTimeout(r, 1700));
+      const body = await fetch(api() + API_PATH + '/house/line/' + encodeURIComponent(id) + '?t=' + Date.now(), { cache: 'no-store' })
+        .then(r => (r.ok ? r.json() : null)).catch(() => null);
+      if (!body || body.error) continue;
+      last = body;
+      if (body.line) return body;
+    }
+    return last;
+  }
+
+  /**
+   * The deed's history. F39 (film 2026-11-12): the panel said "The history did not answer"
+   * while the endpoint had the rows, because one failed request (a 429 from the per-visitor
+   * limit, a cold or redeploying server answering HTML) was final. It now retries a few times,
+   * waits out a 429, and is read again after a House action lands.
+   */
+  async function loadHistory() {
+    const mine = (state.histGen = (state.histGen || 0) + 1);
+    let body = null;
+    for (let i = 0; i < 4 && !body; i++) {
+      if (i) await new Promise(r => setTimeout(r, 1500 * i));
+      if (mine !== state.histGen) return;
+      body = await fetch(api() + API_PATH + '/house/history/' + encodeURIComponent(id) + (i ? '?t=' + Date.now() : ''), { cache: 'no-store' })
+        .then(r => (r.ok ? r.json() : null)).catch(() => null);
+      if (body && !Array.isArray(body.rows)) body = null;
+    }
+    if (mine !== state.histGen) return;
+    const box = root.querySelector('[data-testid=house-history-body]');
+    if (!box) return;
+    if (!body) { box.innerHTML = 'The history did not answer. Nothing was signed.'; return; }
+    paintHistory(box, body);
+  }
+  function paintHistory(box, body) {
+    {
       const rows = body?.rows || [];
       if (!rows.length) {
         box.innerHTML = esc(body?.note || body?.gap || 'No transactions touch this deed yet.');
@@ -433,19 +474,15 @@ export function mountHouseRoom(root, hooks = {}) {
       // A bad timestamp must never take the panel down: `toISOString` throws RangeError on an
       // invalid date, and that is exactly what happened when the units were wrong.
       const when = (ms) => {
-        const n = Number(ms);
+        let n = Number(ms);
         if (!Number.isFinite(n) || n <= 0) return '';
+        // The history reports block time in nanoseconds; a date in ms is below 1e15 until 33658.
+        if (n > 1e15) n = Math.round(n / 1e6);
         const d = new Date(n);
         return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
       };
       box.innerHTML = `<ol class="house-hist-list">${rows.map(r => `<li data-testid="house-hist-row"><b>${esc(r.what)}</b> <span class="muted">${esc(when(r.at))}</span> <a href="${txUrl(esc(r.hash))}" target="_blank" rel="noopener" title="${esc(r.method)}">${esc(String(r.hash).slice(0, 10))}… ↗</a></li>`).join('')}</ol>`
         + (body?.gap ? `<p class="small muted">${esc(body.gap)}</p>` : '');
-    })
-    .catch(() => {
-      const box = root.querySelector('[data-testid=house-history-body]');
-      if (box) box.innerHTML = 'The history did not answer. Nothing was signed.';
-    });
-
-  state.contract = DEED.contract;
-  return { turn, state };
+    }
+  }
 }

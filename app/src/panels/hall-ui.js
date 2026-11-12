@@ -89,10 +89,12 @@ export async function mountHall(root, hooks = {}) {
   let seal = '';
   let lines = [];
   let posted = null;
+  let lastTx = '';
   const ledger = createLedger();
   const form = {
     task: '', budget: '', deadline: '24', parts: '2',
-    workerA: '', workerB: '', quotePart: '1', quoteWorker: '', quoteNear: '', deliverable: '',
+    // F44: two real town keepers as editable defaults, so the form is never two empty required fields.
+    workerA: 'keeper-hall.nearcarta.near', workerB: 'keeper-ferry.nearcarta.near', quotePart: '1', quoteWorker: '', quoteNear: '', deliverable: '',
   };
   let market = { blocked: 'no_token', assignments: [], draft: null, agent: null };
   if (hooks.accountP && !readSessionAccount()) {
@@ -118,7 +120,7 @@ export async function mountHall(root, hooks = {}) {
   };
   const paint = () => {
     const person = visitor();
-    root.innerHTML = jobTray({ tab, form, job: posted, market, seal, lines });
+    root.innerHTML = jobTray({ tab, form, job: posted, market, seal, lines, tx: lastTx });
     const who = root.querySelector('#who') || document.getElementById('who');
     if (who) {
       const saved = readSession();
@@ -231,7 +233,10 @@ export async function mountHall(root, hooks = {}) {
     if (result?.listing) {
       market = { ...market, blocked: result.listing.blocked, agent: result.listing.agent || market.agent, assignments: result.listing.assignments || market.assignments, draft: result.listing.draft || market.draft };
     }
-    if (result?.job && tab === 'post' && result.ok && !result.duplicate) tab = 'agents';
+    if (result?.tx) lastTx = String(result.tx);
+    // F45 (film 2026-11-12): a posted job jumped to Agents, whose only line was "No public market
+    // hire yet", so the visitor lost the receipt they had just made. The receipt is what to show.
+    if (result?.job && tab === 'post' && result.ok && !result.duplicate) tab = 'receipts';
     paint();
     if (result?.cinema && result.tx) hooks.onPaid?.(result);
     else if (result?.seal) hooks.onRefuse?.(result.hint);

@@ -585,9 +585,17 @@ export async function toll(quote) {
   // No contract-wide amount ceiling. The visitor's row is the only limit: the board
   // refuses a value over its per-action cap, daily budget or reserved effect budget,
   // before this call is sent. A hardcoded cap here would be a second, invented rule.
-  const nonce = String(row.nonce ?? '0').replace(/^0+(?=\d)/, '');
-  const args = crossArgs({ actionId: nonce, chain: 'base', asset: quote.asset, to: String(quote.to).toLowerCase(), amount: units, rowBudget: units });
-  const effects = [{ chain: 'base', asset: quote.asset, to: String(quote.to).toLowerCase(), value: units, fee: '0' }];
+  const to = String(quote.to).toLowerCase();
+  // The board reserves this crossing against a budget for this exact destination. Write it
+  // first when the row has none (or too little), with the owner's own key. See ensureTollEffect.
+  const rowBudget = await ensureTollEffect({ asset: quote.asset, to, units });
+  // `set_effects` moved the policy epoch, so the row is read again before anything is signed.
+  const fresh = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null) || row;
+  const nonce = String(fresh.nonce ?? '0').replace(/^0+(?=\d)/, '');
+  // `row_budget` is the toll's cumulative ceiling per row and asset, so it is the row's whole
+  // budget for this asset, not this one amount: `units` alone refused every second crossing.
+  const args = crossArgs({ actionId: nonce, chain: 'base', asset: quote.asset, to, amount: units, rowBudget });
+  const effects = [{ chain: 'base', asset: quote.asset, to, value: units, fee: '0' }];
   const expiry = (BigInt(Date.now()) * 1_000_000n + 3_600_000_000_000n).toString();
   const deposit = String(quote.feeYocto);
   // Ask the board for the exact text it will rebuild, not a local guess. The board derives the
@@ -1181,6 +1189,112 @@ async function guardRowNow() {
   return guardRow;
 }
 
+/**
+ * The ids of this row's open holds, read from the board's own side record (`s` + owner), so a
+ * hold made in another tab or before a reload still gets its Confirm and Cancel controls.
+ * The board has no view that lists holds. The record ends with `u32 count` then `count` u64
+ * ids (contracts/charter_board/src/lib.rs `persist_owner`), so it is read from the end.
+ * Returns null when the chain did not answer: "unknown" must never clear a hold on screen.
+ */
+export async function boardHoldIds(owner = S.me) {
+  if (!S.board || !owner) return null;
+  try {
+    const raw = await boardRecord('s', owner);
+    if (!raw.length) return [];
+    const dv = new DataView(raw.buffer);
+    // Largest count first: an id's high bytes are zeros, so "count 0" would match any tail.
+    // A hold id is a row nonce, far below 2^40, which rules out a match inside the credit.
+    for (let n = 8; n >= 0; n--) {
+      const at = raw.length - 8 * n - 4;
+      if (at < 0 || dv.getUint32(at, true) !== n) continue;
+      const ids = [];
+      for (let i = 0; i < n; i++) ids.push(dv.getBigUint64(at + 4 + 8 * i, true));
+      if (ids.some(x => x >= 1n << 40n)) continue;
+      return ids.map(String);
+    }
+    return null;
+  } catch { return null; }
+}
+/** One board side record (`<prefix>` + borsh(owner)), raw bytes. Null when unread, empty when absent. */
+async function boardRecord(prefix, owner) {
+  const enc = new TextEncoder().encode(owner);
+  const key = new Uint8Array(5 + enc.length);
+  key[0] = prefix.charCodeAt(0); new DataView(key.buffer).setUint32(1, enc.length, true); key.set(enc, 5);
+  const b64 = btoa(String.fromCharCode(...key));
+  const r = await rpc('query', { request_type: 'view_state', finality: 'final', account_id: S.board, prefix_base64: b64 });
+  const want = atob(b64);
+  const hit = (r?.values || []).find(v => atob(v.key) === want);
+  return hit ? Uint8Array.from(atob(hit.value), c => c.charCodeAt(0)) : new Uint8Array(0);
+}
+
+/**
+ * This row's foreign effect budgets, from the board's own `e` record (written by `set_effects`,
+ * encoded by `encode_acts` in contracts/charter_board/src/v2.rs). The board has no view that
+ * lists them. `[]` means the row has none; null means the chain did not answer.
+ */
+export async function boardEffectCaps(owner = S.me) {
+  if (!S.board || !owner) return null;
+  try {
+    const raw = await boardRecord('e', owner);
+    if (!raw.length) return [];
+    const dv = new DataView(raw.buffer);
+    let i = 0;
+    const u32 = () => { const v = dv.getUint32(i, true); i += 4; return v; };
+    const str = () => { const n = u32(); const t = new TextDecoder().decode(raw.subarray(i, i + n)); i += n; return t; };
+    const u128 = () => { const lo = dv.getBigUint64(i, true), hi = dv.getBigUint64(i + 8, true); i += 16; return (hi << 64n) + lo; };
+    const out = [];
+    for (let o = u32(); o > 0; o--) {
+      const who = str();
+      for (let n = u32(); n > 0; n--) {
+        const c = { chain: str(), asset: str(), receiver: str(), value_cap: u128(), value_spent: u128(), fee_cap: u128(), fee_spent: u128() };
+        if (who === owner) out.push(c);
+      }
+    }
+    return out;
+  } catch { return null; }
+}
+
+/**
+ * F37 (film 2026-11-12): every Base crossing from a fresh row failed `ERR_EFFECT`. The toll call
+ * carries one effect (base, asset, destination, value) and the board reserves it against an
+ * effect budget for exactly that destination (`reserve_effects`). Setup writes a budget only
+ * when it knows a Base address, and it never asks for one, so the row had none and the board
+ * refused after the agent had already signed. The destination is typed in the Toll, so the
+ * budget is written there: one owner call to `set_effects`, sized to this crossing, that keeps
+ * every budget the row already has (it replaces the list) and never lowers one.
+ * Returns the asset's total budget, which is the cumulative `row_budget` the toll checks.
+ */
+async function ensureTollEffect({ asset, to, units }) {
+  const caps = await boardEffectCaps();
+  if (caps == null) throw new Error('The board did not answer for your Base budget. Nothing was signed.');
+  const amt = BigInt(units);
+  const mine = caps.find(c => c.chain === 'base' && c.asset === asset && c.receiver === to);
+  const next = caps.map(c => ({ chain: c.chain, asset: c.asset, to: c.receiver, value: c.value_cap, fee: c.fee_cap }));
+  if (!mine || mine.value_spent + amt > mine.value_cap) {
+    const value = (mine ? mine.value_spent : 0n) + amt;
+    const row = next.find(e => e.chain === 'base' && e.asset === asset && e.to === to);
+    if (row) row.value = value > row.value ? value : row.value;
+    else next.push({ chain: 'base', asset, to, value, fee: 0n });
+    const effects = next.map(e => ({ chain: e.chain, asset: e.asset, to: e.to, value: String(e.value), fee: String(e.fee) }));
+    // The first budget costs about 383 bytes, paid from the side reserve `set_calls` prepaid.
+    // The deposit only covers a reserve that is short, and every unused yocto is refunded
+    // in the same call (`charge_acts`). Signed by the row owner: the agent cannot raise its own budget.
+    try { await sign(S.board, [fc('set_effects', { effects }, 50, String(4n * 10n ** 21n))]); }
+    catch (e) {
+      if (userCancelled(e)) { const err = new Error('Cancelled in the wallet. Nothing was signed.'); err.cancelled = true; throw err; }
+      throw new Error(`Your Base budget for this address was not written: ${String(e?.message || e).slice(0, 120)}. Nothing was signed.`);
+    }
+    let ok = false;
+    for (let i = 0; i < 8 && !ok; i++) {
+      if (i) await new Promise(r => setTimeout(r, 1200));
+      const now = await boardEffectCaps().catch(() => null);
+      const c = now?.find(x => x.chain === 'base' && x.asset === asset && x.receiver === to);
+      ok = !!c && c.value_spent + amt <= c.value_cap;
+    }
+    if (!ok) throw new Error('Your Base budget was sent but the board does not show it yet. Press Pay on Base again in a moment. Nothing else was signed.');
+  }
+  return next.filter(e => e.chain === 'base' && e.asset === asset).reduce((a, e) => a + BigInt(e.value), 0n).toString();
+}
 /** The guard shop account, from the deployment record. Never guessed. */
 export const guardAccount = () => S.mainnet?.guard?.contract || '';
 export const houseAccount = () => S.mainnet?.house?.contract || 'house.nearcarta.near';

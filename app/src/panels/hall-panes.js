@@ -2,6 +2,7 @@
 import { TOKEN_SVG } from '../../design/D6_dashboards/src/tokenIcons.js';
 import { activeCta, MARKET_HIRE_GAP, statusLines } from '../../../shared/hall/job.js';
 import { nearOf } from '../../../shared/hall/plan.js';
+import { txUrl } from '../../../shared/net/net.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -52,8 +53,8 @@ function postPane(form, tab) {
       ${field('Max parts', 'hall-parts', form.parts, 'inputmode="numeric"')}
     </div>
     <div class="hall-split">
-      ${field('First worker', 'hall-worker-a', form.workerA, 'autocomplete="off" spellcheck="false"')}
-      ${field('Second worker', 'hall-worker-b', form.workerB, 'autocomplete="off" spellcheck="false"')}
+      ${field('First worker', 'hall-worker-a', form.workerA, 'autocomplete="off" spellcheck="false" placeholder="worker.near"')}
+      ${field('Second worker', 'hall-worker-b', form.workerB, 'autocomplete="off" spellcheck="false" placeholder="another.near"')}
     </div>
   </div>`;
 }
@@ -100,7 +101,13 @@ function receiptsPane(job, tab) {
   return `<div class="hall-pane" data-pane="receipts" ${tab === 'receipts' ? '' : 'hidden'}>${rows}${held}</div>`;
 }
 
-export function jobTray({ tab = 'post', form = {}, job = null, market = null, seal = '', lines = [] }) {
+/** F46: the newest transaction, in full and clickable, at the top of the desk. */
+function txLink(tx) {
+  if (!/^[1-9A-HJ-NP-Za-km-z]{43,44}$/.test(String(tx || ''))) return '';
+  return `<p class="hall-status hall-tx" data-testid="hall-tx">Latest tx <a href="${txUrl(esc(tx))}" target="_blank" rel="noopener">${esc(tx)} ↗</a></p>`;
+}
+
+export function jobTray({ tab = 'post', form = {}, job = null, market = null, seal = '', lines = [], tx = '' }) {
   const cta = activeCta(job);
   // Post job belongs on the Post job tab only. Agents used to show the same gold CTA with the market-hire dead end.
   const showCta = !!(cta && cta.tab === tab);
@@ -110,6 +117,7 @@ export function jobTray({ tab = 'post', form = {}, job = null, market = null, se
     : '';
   return `<div class="hall-card" data-testid="hall-desk">
     ${tabs(tab)}
+    ${txLink(tx)}
     ${flow()}
     ${postPane(form, tab)}
     ${agentsPane(job, form, market, tab)}
