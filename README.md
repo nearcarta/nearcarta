@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml)
 
-<!-- # 1017 backend unit tests (1016 pass, 1 skipped) -->
+<!-- # 1019 backend unit tests (1018 pass, 1 skipped) -->
 
 ## The game
 
@@ -109,6 +109,53 @@ Status: live. The nine keepers form the market council on chain (quorum 5). Each
 
 Status: sponsored gas is live. Each real move is signed by the player and sent by relayer.nearcarta.near, which pays the gas within caps per visitor and per day. In the prod run above, the player's NEAR stayed at 0.003 from the first move to the last ([2TXeZ4hR…](https://nearblocks.io/txns/2TXeZ4hRu2EB4zw9cG6zdq9jgfswKRQs6BwRu1K1uPRM) gather, sell, stall, invest). Email sign-in (Privy) is built and is being confirmed with a real inbox. Judges: every proof is on `/judge`.
 
+
+### Try free: a guest account on the test network
+
+Press **Try free** and you get your own NEAR testnet account in seconds: `<hash>.play.nearcarta.testnet`,
+funded by the city, with the key made in your browser and never sent anywhere. You then play the whole
+day with **real testnet transactions**, each one a receipt you can open. Nothing here is money, and
+nothing here can touch mainnet.
+
+| Step | What the guest's browser really does | Test |
+|---|---|---|
+| **Try free** | One transaction from the funder: `CreateAccount + Transfer(0.25) + AddKey(the guest's key)`. The account name is a hash of the public key, so a retry sends nothing | `guest: start is idempotent for the same public key` |
+| **Welcome crate** | 100 test dollars minted and the market's storage deposited, both paid by the funder | `guest: the account name is a hash of the public key…` |
+| **Open my row** | `open_charter` + `set_calls`, signed and paid by the guest. Receivers and caps come from `testnet.json`, never a literal | `guest play: the row a guest opens comes from the record, not from a literal` |
+| **Take order** | The row posts a job at the Town Hall; the worker is `keeper-hall`, a real keeper account | `guest play: every story step on testnet has a real transaction behind it` |
+| **Unload salt** | Three `gather` calls mint NEP-245 salt, sent as NEP-366 delegate actions through the testnet relayer | same |
+| **Cross** | `toll.cross` then `toll.sign_cross`: a real Chain Signature by `v1.signer-prod.testnet`. **Not broadcast** to Base Sepolia (there is no Base Sepolia ETH), and the card says so | `guest play: the toll is signed and NOT broadcast, said in one line` |
+| **Check buyers** | The honest buyer is paid and the look-alike is refused: the card links the **failed** receipt | `guest play: every card carries a TESTNET pill and a receipt link` |
+| **Sell** | `sell` through the relayer, `min_total` from the live `quote` view | `story: nine steps, one per shop, every shop once` |
+| **Seal profit** | The guest's own row calls `board.anchor(kind, digest, salt)`; only the digest is on chain, the salt stays in the browser | `guest play: every story step on testnet has a real transaction behind it` |
+| **Pay porter** | 3 **test dollars** by `ft_transfer` on the test USD contract, signed and sent by the guest | same |
+| **Invest** | `purse invest` through the relayer: a real Ferry share | same |
+| **Write the day** | The timeline is read from the testnet index and its digest anchored by the guest's row | same |
+
+Caps, all env-configurable on the testnet service: 3 accounts per IP per UTC day, 400 a day across the
+city, a funder floor of 10 test NEAR, and 0.25 test NEAR per guest. Every refusal has its own code and one
+honest line, and Practice mode is always the floor. Tests: `guest: every cap answers its own ERR_ code`,
+`guest: the day counters enforce a per-IP limit and a shared limit, and roll over at midnight`.
+
+### What is on chain, what the operator runs, what is simulated
+
+| Thing | Where it lives | Test that pins it |
+|---|---|---|
+| The guest's account, its key, its board row, every move and every receipt | **On chain**, on NEAR testnet | `guest: start is idempotent for the same public key` |
+| The funder float, the relayer float and the caps | **Operator env** on the testnet service, never in the image | `guest: every cap answers its own ERR_ code` |
+| The look-alike payee the Guardhouse refuses | **Operator**: a separate testnet account from the record | `guest play: the record names every shop a guest row may reach` |
+| The price, purse, stall and share maths between steps | **Simulated** in `shared/market/sim.js`, the same rules as mainnet | `a council vote changes a market rule mid-week, with no code change` |
+| The Ferry swap price, the Payouts cross-chain leg | **Quoted, not executed**: NEAR Intents has no testnet, so it is a live dry quote | `an intents receipt has no tx, and a model job names its dollar cap` |
+| The Base Sepolia transaction the Toll signs | **Signed, not broadcast**, by your decision | `guest play: the toll is signed and NOT broadcast, said in one line` |
+
+### The game is the front door
+
+The first screen is the playable town, with one gold action (**Try free**) and one outlined action
+(**Play for real**). The opening cinematic is a press away (**Watch the story**), not a gate. The entry
+buttons are usable in about 130 ms and the two big optional bundles load lazily, so a phone on a slow
+link still gets a playable first screen. Tests: `the game is the front door and the story is a press away`,
+`the entry buttons are usable before the town finishes loading`.
+
 ---
 
 ## The safety story
@@ -147,7 +194,7 @@ The message to sign is not reproduced by hand: `call_as_message` is an exposed v
 
 ```bash
 npm ci
-npm test                 # 1017 unit tests (1016 pass, 1 skipped)
+npm test                 # 1019 unit tests (1018 pass, 1 skipped)
 npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run build
@@ -170,7 +217,7 @@ cd contracts/arena && cargo +1.95.0 test --lib  # 17 passed
 
 `CI` (`.github/workflows/ci.yml`) runs the backend units, the proof verify, the build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks. `npm run test:contracts` runs the sandbox suites locally against `near-sandbox`, with no keys.
 
-# 1017 unit tests (1016 pass, 1 skipped):
+# 1019 unit tests (1018 pass, 1 skipped):
 Proof rows (108/108 expected).
 
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
@@ -333,7 +380,7 @@ Tests: `cancel and expire are owner-only and never travel with the agent`, `/set
 
 ```bash
 npm ci
-npm test                 # 1017 unit tests (1016 pass, 1 skipped)
+npm test                 # 1019 unit tests (1018 pass, 1 skipped)
 npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run readme-numbers -- --check   # the counts in this file are current
