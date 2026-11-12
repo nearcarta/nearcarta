@@ -183,6 +183,7 @@ export function installNetChrome({ doc = document } = {}) {
       <span class="k" aria-hidden="true">✦</span><span class="lab">Try free</span>
     </a>
     <a id="signIn" class="btn-outline" data-testid="sign-in" href="/setup/" title="Sign in with email and set the rules your agent cannot break">Play for real</a>
+    <a class="btn-quiet" data-testid="watch-story" href="/?story=1" title="Watch the thirty-second opening story">Watch the story</a>
     ${badgeMarkup()}
     <p id="tryFreeNote" class="try-note" data-testid="try-free-note" aria-live="polite"></p>`;
   const badge = doc.getElementById('netBadge');

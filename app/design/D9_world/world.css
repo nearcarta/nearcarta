@@ -1098,3 +1098,9 @@ body.in-shop .net-pitch,body.story .net-pitch{display:none}
   .net-badge{height:28px;padding:0 10px;font-size:10.5px}
   .net-pitch{display:none}
 }
+
+/* A quiet third link: the story is optional, so it reads as a link and never competes with the two
+   real actions. */
+.net-chrome .btn-quiet{display:inline-flex;align-items:center;height:34px;padding:0 10px;border-radius:17px;font:500 13px var(--sans);color:var(--parch2);text-decoration:none;background:transparent;border:0;cursor:pointer}
+.net-chrome .btn-quiet:hover{color:var(--parch);text-decoration:underline}
+@media (max-width:720px){ .net-chrome .btn-quiet{height:30px;font-size:12px} }

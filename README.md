@@ -2,7 +2,25 @@
 
 [![ci](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml)
 
-<!-- # 1016 backend unit tests (1015 pass, 1 skipped) -->
+<!-- # 1017 backend unit tests (1016 pass, 1 skipped) -->
+
+## The game
+
+Nearcarta is a game. You are the Lamplighter's keeper in a small town on a hex island, and your job is
+to keep an AI agent from being talked into paying the wrong person. The town is a Market Day: you take an
+order at the Town Hall, unload salt at the Ferry, pay a toll to cross, check your buyers at the
+Guardhouse, sell at the Arena, seal your profit at the Bank, pay your porter, buy a share of the Ferry and
+write the day into the Chronicle. Nine shops, one day, one loop.
+
+**Play free** starts you on the NEAR test network in seconds: your own account, real testnet
+transactions, no money and no sign-up. **Play for real** opens the mainnet path, where the same shops move
+real NEAR under a charter you sign.
+
+- Play: **https://nearcarta.vercel.app**
+- The charter, in plain words: **https://nearcarta.vercel.app/setup**
+
+The rest of this file is the engineering record behind those two buttons: what is on chain, what the
+operator runs, and what the game simulates.
 
 **An AI agent can be talked into paying the wrong person. Nearcarta puts the payment rules in a NEAR contract the agent cannot change, so a fooled agent produces a refused transaction instead of a loss.**
 
@@ -129,7 +147,7 @@ The message to sign is not reproduced by hand: `call_as_message` is an exposed v
 
 ```bash
 npm ci
-npm test                 # 1016 unit tests (1015 pass, 1 skipped)
+npm test                 # 1017 unit tests (1016 pass, 1 skipped)
 npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run build
@@ -152,7 +170,7 @@ cd contracts/arena && cargo +1.95.0 test --lib  # 17 passed
 
 `CI` (`.github/workflows/ci.yml`) runs the backend units, the proof verify, the build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks. `npm run test:contracts` runs the sandbox suites locally against `near-sandbox`, with no keys.
 
-# 1016 unit tests (1015 pass, 1 skipped):
+# 1017 unit tests (1016 pass, 1 skipped):
 Proof rows (108/108 expected).
 
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
@@ -315,7 +333,7 @@ Tests: `cancel and expire are owner-only and never travel with the agent`, `/set
 
 ```bash
 npm ci
-npm test                 # 1016 unit tests (1015 pass, 1 skipped)
+npm test                 # 1017 unit tests (1016 pass, 1 skipped)
 npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run readme-numbers -- --check   # the counts in this file are current

@@ -75,9 +75,13 @@ test('a room error never shows the engine text', () => {
   assert.match(roomError(new Error('http 500')), /busy/);
 });
 
-test('the town intro plays for a fresh visit and skips when asked', () => {
+test('the town is the front door and the story is opt-in', () => {
+  // A first visit lands in the playable town, not in a 20-second clip: the gold action is in front of
+  // them at once. The cinematic is still there, one press away.
   assert.equal(INTRO_MIN_MS >= 20000, true);
-  assert.equal(introEnabled(''), true);
+  assert.equal(introEnabled(''), false, 'a fresh visit does not play the cinematic');
+  assert.equal(introEnabled('?story=1'), true, 'the story plays when asked');
+  assert.equal(introEnabled('?story=1&nostory'), false, 'nostory still wins');
   assert.equal(introEnabled('?nostory'), false);
   assert.equal(introEnabled('?explore'), false);
   assert.equal(introEnabled('?shop=ferry'), false);
