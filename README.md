@@ -583,6 +583,10 @@ near-sdk (Rust), near-api-js, NEAR Intents 1Click SDK, Privy, NEAR Connect, thre
 
 The first commit in this repository is dated 2026-10-28, after the 2026-10-19 announcement that opens the window (HACKATHON.md Q-001). Every contract, the API, the town and every transaction above were made in the window. Third-party libraries are listed under Built with.
 
+## Related project
+
+Same author, separate submission to the same hackathon: KEYHOLE — an NFT that is the key to a confidential trading account in a TEE.
+
 ## License
 
 [MIT](LICENSE)
