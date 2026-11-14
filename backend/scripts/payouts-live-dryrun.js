@@ -6,7 +6,7 @@
 //   node backend/scripts/payouts-live-dryrun.js --owner <your.near> --invoice-only --amount 0.2 --receive <payee.near>
 // `--deposit` asks 1Click for a real deposit address for one row (still no chain tx and no deposit sent).
 // The script never signs a NEAR transaction: the deposit is the visitor's session propose_call, which
-// only the browser key can make. docs/PAYOUTS_LIVE.md is the owner's checklist.
+// only the browser key can make.
 // Sources: backend/src/payouts-payroll.js payrollRowGate, shared/board/session.js payoutsCalls,
 // backend/src/payouts-invoice.js createInvoice/quoteStored, 1Click EXACT_OUTPUT.
 import { readFileSync } from 'node:fs';

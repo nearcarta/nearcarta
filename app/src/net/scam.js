@@ -1,4 +1,4 @@
-// The scam errand, on the front door: talk a keeper past its cap, and prove the leash with two receipts.
+// The scam errand, on the front door: talk a keeper past its cap, and prove the cap with two receipts.
 //
 // The visitor types anything at a keeper. The keeper answers with a TEE-signed refusal, and that refusal is
 // anchored on chain by the guest's own row. Then the visitor can press **Submit it anyway**, which posts the

@@ -118,7 +118,7 @@ const forced = await send(board, [A.functionCall('propose_call_as', { ...body, s
 if (!forced.hash) die('the forced intent returned no hash, so there is nothing to open');
 say(`forced tx: ${forced.hash}   https://testnet.nearblocks.io/txns/${forced.hash}`);
 const reason = (/panicked: ([^"\\]+)/.exec(String(forced.failure || '')) || [])[1] || null;
-// Only a cap refusal is the leash. A bad signature or a short balance is an outage, not a pass.
+// Only a cap refusal counts. A bad signature or a short balance is an outage, not a pass.
 const capRefused = /^(over_shop_cap|over_session_cap|over_per_action_cap|over_daily_budget|over_daily_action_count)/.test(reason || '');
 say(`the chain said: ${forced.failure ? 'refused — ' + (reason || forced.failure.slice(0, 160)) : 'ALLOWED'}`);
 

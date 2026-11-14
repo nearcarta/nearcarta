@@ -1,4 +1,4 @@
-// The scam errand: talk a keeper past its cap, and prove the leash with two real receipts.
+// The scam errand: talk a keeper past its cap, and prove the cap with two real receipts.
 //
 // A visitor types anything at a keeper, including a prompt injection. The keeper answers on NEAR AI
 // Cloud, and that answer is TEE-signed: the signature covers `model:sha256(request):sha256(response)`,

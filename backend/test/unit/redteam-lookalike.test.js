@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { parseAsk, lookalikeAccount } from '../../../shared/vault/ask.js';
 import * as agent from '../../src/agent.js';
 
-// Red-team R-1/R-2 (judges_review/REDTEAM_NEARAI.md): Cyrillic look-alike payees.
+// Red-team R-1/R-2: Cyrillic look-alike payees.
 const R = ['cafe.ncpub-17102.near', 'books.ncpub-17102.near'];
 
 test('lookalikeAccount flags mixed-script account ids, not plain ones or Arabic prose', () => {
