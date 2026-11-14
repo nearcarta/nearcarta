@@ -12,11 +12,15 @@
 ![contracts](https://img.shields.io/badge/contracts%20rebuilt%20%3D%20on--chain-6%2F6-2ea44f)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-**[Play on mainnet](https://nearcarta.vercel.app)** · **[Try free on testnet](https://nearcarta.vercel.app/?net=testnet)** · **[Proof page](https://nearcarta.vercel.app/judge)** · **[▶ Demo video (4m53s)](https://drive.google.com/file/d/1Tkaojqvx4unWTYTCLWNNf91SZXVOP6b6/view?usp=drivesdk)**
+**[Play on mainnet](https://nearcarta.vercel.app)** · **[Try free on testnet](https://nearcarta.vercel.app/?net=testnet)** · **[Proof page](https://nearcarta.vercel.app/judge)** · **[▶ Demo video + thread (4m53s)](https://x.com/Nearcarta/status/2121719763420241969)**
 
 <img src="docs/media/hero.gif" width="760" alt="A stranger at the town gate asks the Lamplighter for 0.001 NEAR; the gate turns red: the oath said no">
 
 <sub>From the demo film: a stranger at the gate asks the agent to pay a look-alike shop. The rules on chain say no.</sub>
+
+<video src="https://raw.githubusercontent.com/nearcarta/nearcarta/main/docs/demo-film.mp4" controls width="760"></video>
+
+<sub>Watch the full demo film (4m53s) above — also posted as a thread on X: [Nearcarta demo thread](https://x.com/Nearcarta/status/2121719763420241969)</sub>
 
 </div>
 
