@@ -22,6 +22,8 @@
 
 <sub>Watch the full demo film (4m53s) — click the frame to play it, or watch the [demo thread on X](https://x.com/Nearcarta/status/2121719763420241969).</sub>
 
+<sub>Backup mirror of the film on Drive (in case the X post is ever unavailable): [Nearcarta demo film v3 — Drive](https://drive.google.com/file/d/1_IEd1Xy0CxqEAXNBYSXdsERlaB0Gnt4M/view?usp=sharing)</sub>
+
 </div>
 
 ---
