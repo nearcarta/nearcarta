@@ -12,7 +12,7 @@
 ![contracts](https://img.shields.io/badge/contracts%20rebuilt%20%3D%20on--chain-6%2F6-2ea44f)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-**[Play on mainnet](https://nearcarta.vercel.app)** · **[Try free on testnet](https://nearcarta.vercel.app/?net=testnet)** · **[Proof page](https://nearcarta.vercel.app/judge)** · **Demo video:** link added with the X post
+**[Play on mainnet](https://nearcarta.vercel.app)** · **[Try free on testnet](https://nearcarta.vercel.app/?net=testnet)** · **[Proof page](https://nearcarta.vercel.app/judge)** · **[▶ Demo video (4m53s)](https://drive.google.com/file/d/1Tkaojqvx4unWTYTCLWNNf91SZXVOP6b6/view?usp=drivesdk)**
 
 <img src="docs/media/hero.gif" width="760" alt="A stranger at the town gate asks the Lamplighter for 0.001 NEAR; the gate turns red: the oath said no">
 
@@ -114,6 +114,37 @@ These are the real mainnet moves from the filmed Market Day of the Google-signed
 | Chronicle: write the day | [`2EHSeVm7…`](https://nearblocks.io/txns/2EHSeVm7J3jRRe9VcdBYe4X4uTEM29BG22Fu7Kcir1SC) | agent key, `anchor` | Success |
 
 <p align="center"><img src="docs/media/market-day.jpg" width="92%" alt="Ferry: you pay 0 NEAR, the city paid the gas; Arena: sold, price moved"></p>
+
+### Playtest: two more players on mainnet
+
+The filmed Market Day above is one player (`8e20…61c8`, 2026-11-12). Two more accounts played the same loop on mainnet two days earlier, on 2026-11-10, through the same relayer — and neither session appears in any file in this repo: both were read off the chain.
+
+**Second player — `0542fd3d…` (2026-11-10, 05:19–05:25 UTC).** A loop of the market steps: gather, sell, rent a stall, gather again, sell again, invest twice. Every move is a NEP-366 delegate action signed by `relayer.nearcarta.near` (the player paid 0 NEAR in gas).
+
+| Time (UTC) | Move | Transaction | Status |
+|---|---|---|---|
+| 05:19 | Transfer, relayer → player account | [`8Lfi561yuhw…`](https://nearblocks.io/txns/8Lfi561yuhwXXLVbATtuxeT3M11d1G1GCkJk1WnUwEXP) | Success |
+| 05:20 | Ferry: gather salt ×3 (`ferry-1/2/3`) | [`GcwM8NoJQZk…`](https://nearblocks.io/txns/GcwM8NoJQZkt3Qi8PP9ctbgeJxfqomG9Ldh7QeAJbxaR) | Success |
+| 05:20 | Vault Arena: sell 3 salt | [`21pEPqcLxqM…`](https://nearblocks.io/txns/21pEPqcLxqMwVno996zKmmrDvBTSTRsqZmGZuLumQWHi) | Success |
+| 05:20 | Vault Arena: rent stall 2 | [`7fD3d5SU6U1…`](https://nearblocks.io/txns/7fD3d5SU6U168mN8ob8jqWXWG2Rr7QGVwcamQb6kfJnu) | Success |
+| 05:21 | Ferry: gather salt ×3 | [`XpMjMHibrCp…`](https://nearblocks.io/txns/XpMjMHibrCpmk6i18yW6XxTG3dHmRKCpduCWZCEFoDq) | Success |
+| 05:21 | Vault Arena: sell 3 salt | [`Mt4AqyJajqj…`](https://nearblocks.io/txns/Mt4AqyJajqjfo7jhDL447f279X87vjYz18qAqrWja18) | Success |
+| 05:22 | Your House: invest 0.001 NEAR in a Ferry share | [`7DnRUbEzLXA…`](https://nearblocks.io/txns/7DnRUbEzLXAcPz73WTkBUQjeyW3UbdQJMS9X3haDrwfm) | Success |
+| 05:25 | Your House: invest 0.001 NEAR in a Ferry share | [`9MSK8UVPG6h…`](https://nearblocks.io/txns/9MSK8UVPG6h55fAQkgWqfBUfgahF8wtG77HsZ3AsaQ63) | Success |
+
+The two sells bracket a price move: the earlier sell accepted a minimum total of 1.07509248 NEAR for 3 salt; one minute later the second sell accepted 0.9773568 NEAR — the market price moved between the player's own sells, and both cleared.
+
+**Third player — `ace52939…` (2026-11-10, 06:37–07:11 UTC).** The same loop, a longer session: invest, gather, invest, gather, sell.
+
+| Time (UTC) | Move | Transaction | Status |
+|---|---|---|---|
+| 06:37 | Your House: invest 0.001 NEAR in a Ferry share | [`8JocpNEYjMQ…`](https://nearblocks.io/txns/8JocpNEYjMQULcccAg1JBUTYzdd8t7u2do1JG6ck6Uz8) | Success |
+| 06:40 | Ferry: gather salt ×3 | [`3zDp6b51uSB…`](https://nearblocks.io/txns/3zDp6b51uSBsH5GKH69A7ZvebKF8aw3T4Y8aowcvaEc2) | Success |
+| 06:47 | Your House: invest 0.001 NEAR in a Ferry share | [`6UJxdvsGvJU…`](https://nearblocks.io/txns/6UJxdvsGvJUNNt6ciWyC2uEmeND3SqiY5ocYcBhK9WQu) | Success |
+| 07:08 | Ferry: gather salt ×3 | [`BqyW7eUYrSK…`](https://nearblocks.io/txns/BqyW7eUYrSK925mtqgrKbSgqRkHrXYdr8dccsn3LNk7y) | Success |
+| 07:11 | Vault Arena: sell 3 salt | [`CiijYFBsWSL…`](https://nearblocks.io/txns/CiijYFBsWSLwfLaHVfNgRF9m1BT1RCXJyJgEEz9nwq19) | Success |
+
+Three different accounts have now played the Market Day loop on mainnet — the filmed player, and two more found on chain. No names: both are implicit accounts, and the chain names no person.
 
 ### Try free: a guest account on the test network
 
@@ -452,7 +483,7 @@ The Try free run and the keeper errand are listed above (12 transactions, all wi
 
 ## Tests and CI
 
-All 27 jobs of the CI run on the commit live in prod are green: [run 43266368091](https://github.com/nearcarta/nearcarta/actions/runs/43266368091) on `dd656109`.
+All 27 jobs of the CI run on `dd656109` are green: [run 43266368091](https://github.com/nearcarta/nearcarta/actions/runs/43266368091) (2026-11-12). The commit the live deployment serves is the one `GET /api/health` reports in its `git` field.
 
 | Suite | Count | Where it runs |
 |---|---|---|
