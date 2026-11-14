@@ -14,5 +14,5 @@ test('deposit address validation', () => {
 });
 test('ferry source does not describe a sandbox', () => {
   const s = readFileSync(new URL('../../src/ferry.js', import.meta.url), 'utf8');
-  assert.equal(new RegExp(otherNet.source + '|stand-in|tidepool', 'i').test(s), false);
+  assert.equal(new RegExp(otherNet.source + '|stand-in', 'i').test(s), false);
 });

@@ -1251,8 +1251,8 @@ body #shopUI #tray #t-form [data-testid='arena-ids'],
 body #shopUI #tray #t-form .arena-debug { display: none !important; }
 
 /* The Arena's `.arena-lines` block is three technical id lines ("Visitor Guardian · 8ccd…",
-   "Mainnet guardian · nearcarta.near", "Deployed token. Not an arena v2 pot."). The owner asked
-   for them out of the panel. They stay in the DOM for anything that reads them and are not
+   "Mainnet guardian · nearcarta.near", "Deployed token. Not an arena v2 pot."). They are kept
+   out of the panel. They stay in the DOM for anything that reads them and are not
    painted; the arena's live status line above them is untouched. */
 body.shop-ui #shopUI #tray #t-form #arena-live .arena-lines,
 body #shopUI #tray #t-form #arena-live > .arena-lines {

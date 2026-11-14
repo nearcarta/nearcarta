@@ -214,7 +214,7 @@ for (const c of cites) {
       if (a.code !== match) { miss(c, `${c.account} runs ${a.code || 'no code'} on chain`); continue; }
     }
     const art = artifacts.find(x => x.code_hash === match);
-    const externalCode = new RegExp(['tidepool', 'intents', 'signer', 'sp' + 'utnik'].join('|'));
+    const externalCode = new RegExp(['intents', 'signer', 'sp' + 'utnik'].join('|'));
     if (!art && !externalCode.test(String(knownB58.get(match) || ''))) { miss(c, `on chain (${knownB58.get(match)}) but no wasm with this hash on ${REF}`); continue; }
     ok({ ...c, matched: art ? art.path : knownB58.get(match) });
     continue;

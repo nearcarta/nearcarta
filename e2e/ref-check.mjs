@@ -1,4 +1,4 @@
-// The reference checks the owner asked for, in code.
+// Reference checks, in code.
 //
 // The previous suite measured the wrong things and passed panels that did not look like the
 // references. These four checks are the ones that would have caught it:
