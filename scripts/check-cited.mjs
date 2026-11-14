@@ -119,7 +119,7 @@ function walkJson(o, where, parent = null) {
   // A `previous`/`prev`/`prior` block records a build that is no longer deployed. Its code hash
   // and sha256 were true of that build and are kept so a judge can see the history; the ref
   // cannot carry a wasm that was never committed. Keys named as a history are not live citations.
-  if (/(^|\.)(previous|prev|prior|txs_prior_wasm|redeploy)$/.test(where)) {
+  if (/(^|\.)((previous|prev|prior)(_[a-z0-9_]+)?|txs_prior_wasm|redeploy)$/.test(where)) {
     for (const [k, v] of Object.entries(o)) {
       if (typeof v !== 'string') { walkJson(v, `${where}.${k}`, o); continue; }
       if (/(^|_)(tx|txs)$/.test(k) && /^[1-9A-HJ-NP-Za-km-z]{32,}$/.test(v)) add('proof_tx', v, `${where}.${k}`);
@@ -130,6 +130,8 @@ function walkJson(o, where, parent = null) {
   if (o.factory && o.code_hash) RELEASES.push({ factory: o.factory, code_hash: o.code_hash, where });
   for (const [k, v] of Object.entries(o)) {
     const w = `${where}.${k}`;
+    // `previous_code_hash` and the like name a build that is no longer deployed (history, not a live claim).
+    if (typeof v === 'string' && /^(previous|prev|prior)_/.test(k) && !/(^|_)(tx|txs)$/.test(k)) continue;
     if (typeof v === 'string') {
       if (/(^|_)(tx|txs|hash_hex|memo|url|explorer.*|rpc.*|oneclick|txid|value|base_block_hash|proof_payload_hash|foreign_address|quote_signer)$/.test(k) && !/code_hash$/.test(k)) {
         if (/url|explorer|rpc/.test(k)) continue; // links, not repo/chain citations
