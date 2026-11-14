@@ -18,9 +18,9 @@
 
 <sub>From the demo film: a stranger at the gate asks the agent to pay a look-alike shop. The rules on chain say no.</sub>
 
-<video src="https://raw.githubusercontent.com/nearcarta/nearcarta/main/docs/demo-film.mp4" controls width="760"></video>
+[![Watch the demo film (4m53s)](docs/demo-poster.jpg)](https://github.com/nearcarta/nearcarta/blob/main/docs/demo-film.mp4)
 
-<sub>Watch the full demo film (4m53s) above — also posted as a thread on X: [Nearcarta demo thread](https://x.com/Nearcarta/status/2121719763420241969)</sub>
+<sub>Watch the full demo film (4m53s) — click the frame to play it, or watch the [demo thread on X](https://x.com/Nearcarta/status/2121719763420241969).</sub>
 
 </div>
 
