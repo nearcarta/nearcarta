@@ -189,7 +189,7 @@ test('S4 a saved session opens the Rules step without waiting on config', async 
 });
 
 test('S5 the agent map names the shops, routes, contracts, and commands', async () => {
-  const doc = readFileSync(new URL('../docs/AGENT_CONTEXT.md', import.meta.url), 'utf8');
+  const doc = readFileSync(new URL('../docs/ARCHITECTURE.md', import.meta.url), 'utf8');
   for (const name of ['Town', 'Setup', 'Charter office', 'Town Hall', 'Your House', 'Ferry', 'Mist Bank', 'Guardhouse', 'Vault Arena', 'Toll Bridge', 'Chronicle', 'Payouts']) {
     expect(doc).toContain(name);
   }
