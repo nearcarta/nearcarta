@@ -43,7 +43,7 @@ test('parseAgentFerry fills from/to/amt from plain words', () => {
   assert.equal(parseAgentFerry('hello'), null);
 });
 
-test('order chip states match the town's ferry labels', () => {
+test('order chip states match the town\'s ferry labels', () => {
   assert.ok(ORDER_STATES.jetty);
   assert.ok(ORDER_STATES.transit);
   assert.ok(ORDER_STATES.delivered);
