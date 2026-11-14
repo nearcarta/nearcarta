@@ -11,7 +11,7 @@
     "oath_wasm": "contracts/artifacts/oath.r18p86.wasm",
     "reaper_wasm": "contracts/artifacts/reaper.wasm",
     "state_slack_bytes": 8192,
-    "note": "Not on chain. Abandoned: a copy of the oath wasm per visitor does not fit this account. The visitor path is board. See docs/MAINNET_BOARD.md."
+    "note": "Not on chain. Retired design; the visitor path is one shared board. See docs/MAINNET_BOARD.md."
   },
   "board": {
     "contract": "board.nearcarta.near",

@@ -1,4 +1,4 @@
-// Compose ref-vs-our-shot side-by-sides for the five shops the owner asked to see.
+// Compose ref-vs-our-shot side-by-sides for five shops.
 //
 //   node e2e/ref-side-by-side.mjs
 //

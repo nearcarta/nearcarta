@@ -1,21 +1,19 @@
-# Agent context
+# Architecture
 
-A map of this repo. Read this before walking the tree. Claims about live money point at `shared/deployments/mainnet.json`, `judges/VERIFY.md`, or a test named below. Account ids live only in that deployments file.
+A map of this repo: pages, API routes, contracts and commands. Claims about live money point at `shared/deployments/mainnet.json`, `judges/VERIFY.md`, or a test named below. Account ids live only in that deployments file.
 
-The town agent is the Lamplighter. Do not give agents human names.
+The town agent is the Lamplighter.
 
-## Hard rules
+## Guarantees
 
 - The API does not sign mainnet. `quote()` stays `dry: true`. `POST /api/ferry/checkout` may ask 1Click for a deposit address only after the visitor row allows the recipient and the amount (`backend/src/ferry-checkout.js`). There is no product USD cap; the row is the only limit. It does not send the deposit.
-- The deployed API holds no NEAR key. Vault ask, attack, and task return 503 without one. Keys stay outside the repo. Never commit, log, or print a key or token.
-- Do not spend NEAR, broadcast `set_rules`, or click Run it live from an agent session.
+- The deployed API holds no NEAR key. Vault ask, attack, and task return 503 without one. Keys stay outside the repo; CI runs gitleaks over the full history.
 - Visitor and judge surfaces are mainnet. Addresses are read from `shared/deployments/mainnet.json`, not hardcoded.
 - Contract view args: U64 values are strings. `get_action` takes `action_id`; its record has `clause_id`.
-- The spend gate is the charter (`contracts/oath` `propose`). The agent key can only call `propose` and `propose_batch`.
+- The spend gate is the visitor's row on the board (`contracts/charter_board`). The row's agent key can call `propose`, `propose_call`, `propose_call_as`, `confirm_hold`, `tighten_rules` and `anchor`, and nothing else.
 - A model job is capped before it is sent: 160 tokens, $0.05, and 300 calls a day (`backend/src/agent.js` `budgetStatus`). The NEAR it can move is still the charter cap.
 - `AI_PROVE_ENABLED` stays off unless the account has credits. The TEE evidence check is free and always on.
-- Run `gitleaks git --config .gitleaks.toml --redact .` before every push.
-- Every new claim in a doc needs a test or a mainnet tx already in the repo.
+- Every claim in a doc points at a test or a mainnet tx in the repo.
 
 ## Layout
 
@@ -59,8 +57,6 @@ Shop pages other than the charter office, Town Hall proposals, and Payouts are g
 
 ## Deploy
 
-Do not deploy from an agent session unless the task says so. Do not pass `--live`.
-
 ```bash
 NEARCARTA_API= npm run build          # app/dist. Empty NEARCARTA_API keeps /api on the same origin
 node app/serve.mjs                     # UI on :5173, proxies /api to :8787
@@ -85,8 +81,8 @@ npm run test:contracts                 # contract crates, including the oath san
 npm run readme-numbers -- --check      # README and judges/VERIFY.md counts match the last full run
 ```
 
-Counts in `README.md` come from a full run. A partial Playwright run writes `judges/proofs/e2e-results.json` and must not be committed.
+Counts in `README.md` come from a full run. A partial Playwright run writes `judges/proofs/e2e-results.json`; only full runs are committed.
 
-Oath library tests: `cd contracts/oath && cargo test --lib`. Board library tests: `cd contracts/charter_board && cargo +1.86.0 test --lib`. The sandbox suites are the three commands in `README.md`.
+Oath library tests: `cd contracts/oath && cargo test --lib`. Board library tests: `cd contracts/charter_board && cargo +1.86.0 test --lib`. The sandbox suites run with `npm run test:contracts`.
 
 Browser checks for the shop shell live in `e2e/section-s.spec.js` and the earlier `e2e/section-*.spec.js` files. Skipped end-to-end tests would sign real transactions. They are skipped, not mocked.

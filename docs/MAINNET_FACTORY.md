@@ -1,6 +1,6 @@
 # Mainnet visitor factory
 
-This factory is not the visitor path. Copying the oath wasm onto each charter costs more than `nearcarta.near` can fund, and the stake does not fit a 1 NEAR deploy. The visitor path is the one board in `docs/MAINNET_BOARD.md`. The code below stays so the old cost math can still be read.
+This is a retired design, kept with its unit and sandbox tests. The live visitor path is the one board in `docs/MAINNET_BOARD.md`: one shared contract, one row per visitor.
 
 # Mainnet visitor factory (retired)
 

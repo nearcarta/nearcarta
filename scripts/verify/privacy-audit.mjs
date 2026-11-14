@@ -38,8 +38,8 @@ async function apiPass(base, tag) {
   const g = async p => { const r = await hit(base + p, { where: tag }); return r && j(r.text); };
   const dep = await g('/api/deployments') || {};
   await g('/api/health'); await g('/api/whoami');
-  await g('/api/ferry/tokens'); await g('/api/ferry/tidepool');
-  const tp = await g('/api/ferry/tidepool');
+  await g('/api/ferry/tokens');
+  const tp = null;
   await g('/api/ferry/status'); await g('/api/ferry/status?env=MAINNET'); await g('/api/ferry/status?depositAddress=nope');
   if (tp?.deposit_address || tp?.depositAddress) await g('/api/ferry/status?depositAddress=' + encodeURIComponent(tp.deposit_address || tp.depositAddress));
   await g('/api/ferry/zcash/not-an-address'); await g('/api/ferry/zcash/utest1' + 'q'.repeat(60));

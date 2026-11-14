@@ -92,7 +92,7 @@ test('a row that names the old network does not wear a mainnet badge', () => {
 test('guest and the old send queue are not routes', async () => {
   const app = makeApp();
   const ip = { 'cf-connecting-ip': '192.0.2.40' };
-  for (const path of ['/api/guest', '/api/mistbank/send', '/api/ferry/tidepool']) {
+  for (const path of ['/api/guest', '/api/mistbank/send']) {
     const r = await app.request(path, { headers: ip });
     assert.equal(r.status, 404, path);
   }

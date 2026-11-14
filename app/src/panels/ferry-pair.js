@@ -1,6 +1,5 @@
 // Pure Ferry pair helpers (city room + rules + agent chat).
-// Sources: depth-plan-v2 §1 (all live 1Click assets); TOWN_PLAN live-oath-state for Ferry;
-// 1Click tokens GET https://1click.chaindefuser.com/v0/tokens; brief-V V4.
+// Every live 1Click asset, from GET https://1click.chaindefuser.com/v0/tokens.
 
 import { shortReceive, validateDestAddress } from './ferry-settle.js';
 
@@ -174,7 +173,7 @@ export function agentCargoPlan(text, { charterReady = false } = {}) {
   return { ok: true, parsed, mode };
 }
 
-/** Order-chip states sketched in TOWN_PLAN (Ferry open order) + D9 sFerry labels. */
+/** Order-chip states for the Ferry open order, matching the D9 sFerry labels. */
 export const ORDER_STATES = {
   jetty: { id: 'jetty', label: 'at the jetty', cls: 'order' },
   quoted: { id: 'quoted', label: 'quote stamped · waiting', cls: 'order gold' },

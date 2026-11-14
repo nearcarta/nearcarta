@@ -1,7 +1,7 @@
 // Ferry: any live 1Click pair crosses the strait. Default demo is USDC@Base → ZEC (shielded).
 // The quote is a real dry 1Click read through the Nearcarta API (snapshot in data/live.js); the crossing re-enacts the visitor's picker choice, nothing is sent.
 // Before the boat leaves, a downgraded echo of the same quote is refused, with the same echo-guard rule as tech backend/src/ferry.js.
-// Sources: depth-plan-v2 §1; TOWN_PLAN Ferry live-oath-state (order chip); STRENGTHEN §4 standing order; brief-V V4; 1Click /v0/tokens.
+// Data: the live 1Click token list (/v0/tokens) and the row's standing order.
 import { THREE, room, put, makeRobot, sfx, wait, tween, easeInOut, C } from '../js/core.js';
 import { SIGNED, UNSIGNED } from '../../D6_dashboards/src/data.js';
 import { boat } from '../js/town.js';

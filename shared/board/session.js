@@ -101,7 +101,7 @@ export function sessionLabel(hours) {
   return h === 1 ? '1 hour' : `${h} hours`;
 }
 
-// wrap.near is the NEP-141 wNEAR used for NEAR→1Click deposit legs (brief-V V4; ferry_intents wrap_near tx).
+// wrap.near is the NEP-141 wNEAR used for NEAR→1Click deposit legs (see ferry_intents wrap_near tx).
 // https://docs.near.org/tutorials/tokens/creating-a-ft ; near_deposit / ft_transfer / storage_deposit on wrap.near.
 export const FERRY_CALL_TARGETS = [
   { receiver: 'wrap.near', method: 'near_deposit' },
